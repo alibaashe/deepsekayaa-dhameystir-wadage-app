@@ -1949,19 +1949,41 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    // 2. Check explicit driverWallets map
-    let mapBal: number | null = null;
+    // 2. Check explicit driverWallets map (highest priority live store)
     for (const key of candidateKeys) {
       if (driverWallets[key] !== undefined) {
         const val = Number(driverWallets[key]);
-        if (!isNaN(val) && val > 0) {
-          mapBal = val;
-          break;
+        if (!isNaN(val)) {
+          return Math.max(0, Math.round(val * 100) / 100);
         }
       }
     }
 
-    // 3. Calculate authoritative net balance from completed driverWalletTransactions ledger
+    // 3. Check driver object in drivers array
+    if (matchedDrv) {
+      const val = matchedDrv.walletBalanceUsd !== undefined
+        ? Number(matchedDrv.walletBalanceUsd)
+        : (matchedDrv as any).wallet_balance_usd !== undefined
+        ? Number((matchedDrv as any).wallet_balance_usd)
+        : undefined;
+      if (val !== undefined && !isNaN(val)) {
+        return Math.max(0, Math.round(val * 100) / 100);
+      }
+    }
+
+    // 4. Check currentUser if driver
+    if (currentUser && currentUser.role === 'driver') {
+      const val = currentUser.walletBalanceUsd !== undefined
+        ? Number(currentUser.walletBalanceUsd)
+        : (currentUser as any).wallet_balance_usd !== undefined
+        ? Number((currentUser as any).wallet_balance_usd)
+        : undefined;
+      if (val !== undefined && !isNaN(val)) {
+        return Math.max(0, Math.round(val * 100) / 100);
+      }
+    }
+
+    // 5. Calculate net balance from completed driverWalletTransactions ledger as fallback
     let ledgerSumUsd = 0;
     let hasCompletedTx = false;
 
@@ -1989,50 +2011,8 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     }
 
-    // 4. Check driver object in drivers array
-    let drvObjBal: number | null = null;
-    if (matchedDrv) {
-      const val = matchedDrv.walletBalanceUsd !== undefined
-        ? Number(matchedDrv.walletBalanceUsd)
-        : (matchedDrv as any).wallet_balance_usd !== undefined
-        ? Number((matchedDrv as any).wallet_balance_usd)
-        : undefined;
-      if (val !== undefined && !isNaN(val) && val > 0) {
-        drvObjBal = val;
-      }
-    }
-
-    // 5. Check currentUser if driver
-    let userBal: number | null = null;
-    if (currentUser && currentUser.role === 'driver') {
-      const val = currentUser.walletBalanceUsd !== undefined
-        ? Number(currentUser.walletBalanceUsd)
-        : (currentUser as any).wallet_balance_usd !== undefined
-        ? Number((currentUser as any).wallet_balance_usd)
-        : undefined;
-      if (val !== undefined && !isNaN(val) && val > 0) {
-        userBal = val;
-      }
-    }
-
-    // Authoritative resolution: prioritize positive verified balance across active sources
-    const candidates = [
-      mapBal,
-      hasCompletedTx ? Math.max(0, ledgerSumUsd) : null,
-      drvObjBal,
-      userBal,
-    ].filter((v): v is number => v !== null && !isNaN(v));
-
-    if (candidates.length > 0) {
-      const resolved = Math.max(...candidates);
-      return Math.round(resolved * 100) / 100;
-    }
-
-    // Direct check if mapBal is explicitly 0
-    for (const key of candidateKeys) {
-      if (driverWallets[key] !== undefined) {
-        return Math.max(0, Number(driverWallets[key]) || 0);
-      }
+    if (hasCompletedTx) {
+      return Math.max(0, Math.round(ledgerSumUsd * 100) / 100);
     }
 
     return 0.00;
