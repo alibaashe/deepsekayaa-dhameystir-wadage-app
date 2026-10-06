@@ -1176,6 +1176,46 @@ Return ONLY valid JSON matching this schema:
     res.json({ success: true, data: dbService.store.system_settings });
   });
 
+  // Website CMS Configuration Endpoint (GET)
+  app.get('/api/website/cms-config', (_req, res) => {
+    const cmsItem = (dbService.store.system_settings || []).find(
+      (s: any) => s.setting_key === 'website_cms_config'
+    );
+    if (cmsItem && cmsItem.setting_value) {
+      try {
+        const parsed = JSON.parse(cmsItem.setting_value);
+        return res.json(parsed);
+      } catch (_e) {}
+    }
+    res.json(null);
+  });
+
+  // Website CMS Configuration Endpoint (POST)
+  app.post('/api/website/cms-config', (req, res) => {
+    const config = req.body;
+    if (!config || typeof config !== 'object') {
+      return res.status(400).json({ error: 'Invalid config payload' });
+    }
+
+    const strVal = JSON.stringify(config);
+    const existing = dbService.store.system_settings || [];
+    const index = existing.findIndex((item: any) => item.setting_key === 'website_cms_config');
+    if (index >= 0) {
+      existing[index] = { ...existing[index], setting_value: strVal };
+    } else {
+      existing.push({ setting_key: 'website_cms_config', setting_value: strVal });
+    }
+    dbService.store.system_settings = existing;
+
+    // Broadcast SSE to live website clients
+    const ssePayload = `data: ${JSON.stringify({ type: 'CMS_CONFIG_UPDATED', payload: config, timestamp: Date.now() })}\n\n`;
+    for (const client of sseClients) {
+      try { client.write(ssePayload); } catch (_e) { sseClients.delete(client); }
+    }
+
+    res.json({ success: true, message: 'Website CMS updated successfully', config });
+  });
+
   app.post('/api/db/settings', (req, res) => {
     const payload = req.body;
     if (Array.isArray(payload)) {

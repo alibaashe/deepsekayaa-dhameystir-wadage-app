@@ -75,6 +75,69 @@ export interface WebsiteContactInfo {
   appStoreUrl?: string;
 }
 
+export interface WebsiteFaqItem {
+  id: string;
+  questionSo: string;
+  questionEn: string;
+  answerSo: string;
+  answerEn: string;
+  category: 'general' | 'riders' | 'drivers' | 'payments';
+  enabled: boolean;
+}
+
+export interface WebsiteStatsConfig {
+  enabled: boolean;
+  activeDriversCount: string;
+  activeDriversLabelSo: string;
+  activeDriversLabelEn: string;
+  tripsCompletedCount: string;
+  tripsCompletedLabelSo: string;
+  tripsCompletedLabelEn: string;
+  customerRating: string;
+  customerRatingLabelSo: string;
+  customerRatingLabelEn: string;
+  citiesCount: string;
+  citiesLabelSo: string;
+  citiesLabelEn: string;
+}
+
+export interface WebsiteCalculatorConfig {
+  enabled: boolean;
+  titleSo: string;
+  titleEn: string;
+  subtitleSo: string;
+  subtitleEn: string;
+  defaultPickup: string;
+  defaultDropoff: string;
+  defaultDistanceKm: number;
+}
+
+export interface WebsiteNavbarConfig {
+  brandName: string;
+  taglineSo: string;
+  taglineEn: string;
+  riderButtonTextSo: string;
+  riderButtonTextEn: string;
+  driverButtonTextSo: string;
+  driverButtonTextEn: string;
+  adminButtonTextSo: string;
+  adminButtonTextEn: string;
+  showLanguageToggle: boolean;
+  showEmergencyHotline: boolean;
+}
+
+export interface WebsiteFooterConfig {
+  aboutTextSo: string;
+  aboutTextEn: string;
+  copyrightTextSo: string;
+  copyrightTextEn: string;
+  showSocialIcons: boolean;
+  quickLinksTitleSo: string;
+  quickLinksTitleEn: string;
+  servicesTitleSo: string;
+  servicesTitleEn: string;
+}
+
 export interface WebsiteSeoConfig {
   metaTitle: string;
   metaDescription: string;
@@ -85,10 +148,15 @@ export interface WebsiteSeoConfig {
 export interface WebsiteCmsConfig {
   hero: WebsiteHeroConfig;
   announcement: WebsiteAnnouncementConfig;
+  navbar?: WebsiteNavbarConfig;
   features: WebsiteFeatureItem[];
   services: WebsiteServiceCard[];
+  stats?: WebsiteStatsConfig;
+  calculator?: WebsiteCalculatorConfig;
   testimonials: WebsiteTestimonial[];
+  faqs?: WebsiteFaqItem[];
   contact: WebsiteContactInfo;
+  footer?: WebsiteFooterConfig;
   seo: WebsiteSeoConfig;
   lastUpdated?: string;
   updatedBy?: string;
@@ -117,6 +185,44 @@ export const DEFAULT_WEBSITE_CMS_CONFIG: WebsiteCmsConfig = {
     linkTextEn: 'Book Now',
     linkUrl: '#book',
     bgGradient: 'from-emerald-700 via-teal-800 to-slate-900',
+  },
+  navbar: {
+    brandName: 'Wadaage Mobility',
+    taglineSo: 'Gaadiidka Casriga ah ee Somaliland',
+    taglineEn: 'Smart Ride-Hailing Platform in Somaliland',
+    riderButtonTextSo: 'Rakaabka (Rider App)',
+    riderButtonTextEn: 'Rider App',
+    driverButtonTextSo: 'Darawalka (Driver App)',
+    driverButtonTextEn: 'Driver App',
+    adminButtonTextSo: 'Maamulka (Admin)',
+    adminButtonTextEn: 'Admin Portal',
+    showLanguageToggle: true,
+    showEmergencyHotline: true,
+  },
+  stats: {
+    enabled: true,
+    activeDriversCount: '150+',
+    activeDriversLabelSo: 'Darawallo Firfircoon',
+    activeDriversLabelEn: 'Active Verified Drivers',
+    tripsCompletedCount: '45,000+',
+    tripsCompletedLabelSo: 'Safarro Guuleystay',
+    tripsCompletedLabelEn: 'Completed Rides',
+    customerRating: '4.9 ★',
+    customerRatingLabelSo: 'Qanacsanaanta Macaamiisha',
+    customerRatingLabelEn: 'Customer Satisfaction',
+    citiesCount: '4',
+    citiesLabelSo: 'Magaalooyinka Somaliland',
+    citiesLabelEn: 'Somaliland Cities Connected',
+  },
+  calculator: {
+    enabled: true,
+    titleSo: 'Qiyaas Qiimaha Safarkaaga Hargeysa',
+    titleEn: 'Instant Fare Estimator in Hargeisa',
+    subtitleSo: 'Dooro meesha aad ka baxayso iyo meesha aad u socoto si aad u ogaato qiimaha rasmiga ah ee Wadaage Share ama Taxi Gaar ah.',
+    subtitleEn: 'Select your pickup and drop-off to compare live fares between Wadaage Share carpooling and Private Taxi.',
+    defaultPickup: 'Egal International Airport',
+    defaultDropoff: 'Dahabshiil Bank HQ, 26 June',
+    defaultDistanceKm: 6.5,
   },
   features: [
     {
@@ -256,6 +362,44 @@ export const DEFAULT_WEBSITE_CMS_CONFIG: WebsiteCmsConfig = {
       verified: true,
     },
   ],
+  faqs: [
+    {
+      id: 'faq_1',
+      questionSo: 'Waa maxay Wadaage Share (Gaadhi Wadaag)?',
+      questionEn: 'What is Wadaage Share (Carpooling)?',
+      answerSo: 'Wadaage Share waa adeeg casri ah oo kuu sahlaya inaad gaadhiga la wadaagto qof kale oo jidkaaga ku socda. Waxaad badbaadinaysaa 30% qiimaha caadiga ah adigoo helaya safar degdeg ah oo aamin ah.',
+      answerEn: 'Wadaage Share is a smart carpooling service that lets you share a ride with co-passengers heading along the same corridor in Hargeisa. You save up to 30% compared to private taxis while enjoying fast, verified transport.',
+      category: 'riders',
+      enabled: true,
+    },
+    {
+      id: 'faq_2',
+      questionSo: 'Sidee lacagta loogu bixiyaa ZAAD ama eDahab?',
+      questionEn: 'How do I pay with ZAAD or eDahab?',
+      answerSo: 'Wadaage wuxuu toos ugu xidhan yahay adeegyada lacagaha mobilka (ZAAD, eDahab, Sahal). Waxaad toos ugu bixin kartaa lacagta app-ka dhexdiisa 1-taabasho ama lacag caddaan ah (Cash) marka safarku dhamaado.',
+      answerEn: 'Wadaage supports seamless 1-tap in-app payments via ZAAD, eDahab, and Sahal, as well as direct cash payment to the driver upon drop-off.',
+      category: 'payments',
+      enabled: true,
+    },
+    {
+      id: 'faq_3',
+      questionSo: 'Sideen noqon karaa darawal Wadaage?',
+      questionEn: 'How do I register as a Wadaage Driver Partner?',
+      answerSo: 'Guji badhanka "Driver App" ama "Noqo Dareewal", geli lambarkaaga WhatsApp, soo geli sawirka shatiga iyo baabuurka. Ansixintu waxay qaadataa wax ka yar 24 saacadood, waxaanad ku shaqaynaysaa komishanka ugu jaban Somaliland (1,000 SLSH oo go’an safarkiiba).',
+      answerEn: 'Click "Driver App" or "Register as Driver", enter your WhatsApp phone number, and upload your driver license & vehicle details. Approval takes under 24 hours, and you keep 100% of your fares minus a fixed 1,000 SLSH ($0.10) flat fee.',
+      category: 'drivers',
+      enabled: true,
+    },
+    {
+      id: 'faq_4',
+      questionSo: 'Sidee amniga safarka loo ilaaliyaa?',
+      questionEn: 'How does Wadaage ensure passenger safety?',
+      answerSo: 'Dhammaan darawallada waxaa lagu xaqiijiyaa Somaliland ID iyo baadhitaan dhab ah. Waxa kale oo aad haysataa badhanka SOS, la wadaagista jidkaaga tooska ah ehelkaaga (WhatsApp Live Share), iyo calaamada midabka (Safety Beacon).',
+      answerEn: 'All drivers undergo strict identity and document verification. Trips feature real-time GPS tracking, WhatsApp live trip sharing with family, in-app emergency SOS, and safety color beacon matching.',
+      category: 'general',
+      enabled: true,
+    },
+  ],
   contact: {
     phonePrimary: '+252 63 6807814',
     phoneSecondary: '+252 63 4819202',
@@ -267,6 +411,17 @@ export const DEFAULT_WEBSITE_CMS_CONFIG: WebsiteCmsConfig = {
     facebookUrl: 'https://facebook.com/wadaagesomaliland',
     twitterUrl: 'https://twitter.com/wadaage',
     instagramUrl: 'https://instagram.com/wadaage.somaliland',
+  },
+  footer: {
+    aboutTextSo: 'Wadaage Mobility waa nidaamka gaadiidka casriga ah ee Somaliland oo bixiya Wadaage Share carpooling iyo Private Taxi qiimo jaban oo ammaan ah.',
+    aboutTextEn: 'Wadaage Mobility is Somaliland’s premier smart ride-hailing and carpooling ecosystem engineered for reliable, affordable city transit.',
+    copyrightTextSo: 'Xuquuqda oo dhan way dhowran tahay © 2026 Wadaage Mobility Somaliland. wadaage.com',
+    copyrightTextEn: 'All rights reserved © 2026 Wadaage Mobility Somaliland. wadaage.com',
+    showSocialIcons: true,
+    quickLinksTitleSo: 'Xiriirinta Degdegga ah',
+    quickLinksTitleEn: 'Quick Links',
+    servicesTitleSo: 'Adeegyadeena',
+    servicesTitleEn: 'Our Services',
   },
   seo: {
     metaTitle: 'Wadaage Somaliland — Gaadiidka Casriga ah & Taxi ee Hargeysa | Wadaage.com',

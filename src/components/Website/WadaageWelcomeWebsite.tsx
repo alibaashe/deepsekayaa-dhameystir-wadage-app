@@ -102,30 +102,42 @@ export const WadaageWelcomeWebsite: React.FC<WadaageWelcomeWebsiteProps> = ({
     onNavigate('rider');
   };
 
-  const faqList = [
+  const activeFaqs = (cmsConfig.faqs && cmsConfig.faqs.length > 0) ? cmsConfig.faqs.filter(f => f.enabled !== false) : [
     {
-      qSo: 'Waa maxay Wadaage Share (Gaadhi Wadaag)?',
-      qEn: 'What is Wadaage Share (Carpooling)?',
-      aSo: 'Wadaage Share waa adeeg casri ah oo kuu sahlaya inaad gaadhiga la wadaagto qof kale oo jidkaaga ku socda. Waxaad badbaadinaysaa 30% qiimaha caadiga ah adigoo helaya safar degdeg ah oo aamin ah.',
-      aEn: 'Wadaage Share is a smart carpooling service that lets you share a ride with co-passengers heading along the same corridor in Hargeisa. You save up to 30% compared to private taxis while enjoying fast, verified transport.',
+      id: 'faq_1',
+      questionSo: 'Waa maxay Wadaage Share (Gaadhi Wadaag)?',
+      questionEn: 'What is Wadaage Share (Carpooling)?',
+      answerSo: 'Wadaage Share waa adeeg casri ah oo kuu sahlaya inaad gaadhiga la wadaagto qof kale oo jidkaaga ku socda. Waxaad badbaadinaysaa 30% qiimaha caadiga ah adigoo helaya safar degdeg ah oo aamin ah.',
+      answerEn: 'Wadaage Share is a smart carpooling service that lets you share a ride with co-passengers heading along the same corridor in Hargeisa. You save up to 30% compared to private taxis while enjoying fast, verified transport.',
+      category: 'riders' as const,
+      enabled: true,
     },
     {
-      qSo: 'Sidee lacagta loogu bixiyaa ZAAD ama eDahab?',
-      qEn: 'How do I pay with ZAAD or eDahab?',
-      aSo: 'Wadaage wuxuu toos ugu xidhan yahay adeegyada lacagaha mobilka (ZAAD, eDahab, Sahal). Waxaad toos ugu bixin kartaa lacagta app-ka dhexdiisa 1-taabasho ama lacag caddaan ah (Cash) marka safarku dhamaado.',
-      aEn: 'Wadaage supports seamless 1-tap in-app payments via ZAAD, eDahab, and Sahal, as well as direct cash payment to the driver upon drop-off.',
+      id: 'faq_2',
+      questionSo: 'Sidee lacagta loogu bixiyaa ZAAD ama eDahab?',
+      questionEn: 'How do I pay with ZAAD or eDahab?',
+      answerSo: 'Wadaage wuxuu toos ugu xidhan yahay adeegyada lacagaha mobilka (ZAAD, eDahab, Sahal). Waxaad toos ugu bixin kartaa lacagta app-ka dhexdiisa 1-taabasho ama lacag caddaan ah (Cash) marka safarku dhamaado.',
+      answerEn: 'Wadaage supports seamless 1-tap in-app payments via ZAAD, eDahab, and Sahal, as well as direct cash payment to the driver upon drop-off.',
+      category: 'payments' as const,
+      enabled: true,
     },
     {
-      qSo: 'Sideen noqon karaa darawal Wadaage?',
-      qEn: 'How do I register as a Wadaage Driver Partner?',
-      aSo: 'Guji badhanka "Driver App" ama "Noqo Dareewal", geli lambarkaaga WhatsApp, soo geli sawirka shatiga iyo baabuurka. Ansixintu waxay qaadataa wax ka yar 24 saacadood, waxaanad ku shaqaynaysaa komishanka ugu jaban Somaliland (1,000 SLSH oo go’an safarkiiba).',
-      aEn: 'Click "Driver App" or "Register as Driver", enter your WhatsApp phone number, and upload your driver license & vehicle details. Approval takes under 24 hours, and you keep 100% of your fares minus a fixed 1,000 SLSH ($0.10) flat fee.',
+      id: 'faq_3',
+      questionSo: 'Sideen noqon karaa darawal Wadaage?',
+      questionEn: 'How do I register as a Wadaage Driver Partner?',
+      answerSo: 'Guji badhanka "Driver App" ama "Noqo Dareewal", geli lambarkaaga WhatsApp, soo geli sawirka shatiga iyo baabuurka. Ansixintu waxay qaadataa wax ka yar 24 saacadood, waxaanad ku shaqaynaysaa komishanka ugu jaban Somaliland (1,000 SLSH oo go’an safarkiiba).',
+      answerEn: 'Click "Driver App" or "Register as Driver", enter your WhatsApp phone number, and upload your driver license & vehicle details. Approval takes under 24 hours, and you keep 100% of your fares minus a fixed 1,000 SLSH ($0.10) flat fee.',
+      category: 'drivers' as const,
+      enabled: true,
     },
     {
-      qSo: 'Sidee amniga safarka loo ilaaliyaa?',
-      qEn: 'How does Wadaage ensure passenger safety?',
-      aSo: 'Dhammaan darawallada waxaa lagu xaqiijiyaa Somaliland ID iyo baadhitaan dhab ah. Waxa kale oo aad haysataa badhanka SOS, la wadaagista jidkaaga tooska ah ehelkaaga (WhatsApp Live Share), iyo calaamada midabka (Safety Beacon).',
-      aEn: 'All drivers undergo strict identity and document verification. Trips feature real-time GPS tracking, WhatsApp live trip sharing with family, in-app emergency SOS, and safety color beacon matching.',
+      id: 'faq_4',
+      questionSo: 'Sidee amniga safarka loo ilaaliyaa?',
+      questionEn: 'How does Wadaage ensure passenger safety?',
+      answerSo: 'Dhammaan darawallada waxaa lagu xaqiijiyaa Somaliland ID iyo baadhitaan dhab ah. Waxa kale oo aad haysataa badhanka SOS, la wadaagista jidkaaga tooska ah ehelkaaga (WhatsApp Live Share), iyo calaamada midabka (Safety Beacon).',
+      answerEn: 'All drivers undergo strict identity and document verification. Trips feature real-time GPS tracking, WhatsApp live trip sharing with family, in-app emergency SOS, and safety color beacon matching.',
+      category: 'general' as const,
+      enabled: true,
     },
   ];
 
@@ -376,21 +388,27 @@ export const WadaageWelcomeWebsite: React.FC<WadaageWelcomeWebsiteProps> = ({
               {/* Trust Metrics Grid */}
               <div className="grid grid-cols-3 gap-3 sm:gap-4 pt-4 border-t border-slate-800 max-w-lg mx-auto lg:mx-0 text-left">
                 <div className="bg-slate-900/60 p-3 rounded-2xl border border-slate-800">
-                  <div className="text-lg sm:text-xl font-black text-emerald-400 font-mono">10,650+</div>
+                  <div className="text-lg sm:text-xl font-black text-emerald-400 font-mono">
+                    {cmsConfig.stats?.activeDriversCount || '150+'}
+                  </div>
                   <div className="text-[10px] sm:text-[11px] text-slate-400 font-bold">
-                    {language === 'so' ? 'Goobaha Hargeysa' : 'Hargeisa Places'}
+                    {language === 'so' ? (cmsConfig.stats?.activeDriversLabelSo || 'Darawallo Firfircoon') : (cmsConfig.stats?.activeDriversLabelEn || 'Active Drivers')}
                   </div>
                 </div>
                 <div className="bg-slate-900/60 p-3 rounded-2xl border border-slate-800">
-                  <div className="text-lg sm:text-xl font-black text-emerald-400 font-mono">100%</div>
+                  <div className="text-lg sm:text-xl font-black text-emerald-400 font-mono">
+                    {cmsConfig.stats?.tripsCompletedCount || '45,000+'}
+                  </div>
                   <div className="text-[10px] sm:text-[11px] text-slate-400 font-bold">
-                    {language === 'so' ? 'ZAAD & eDahab' : 'Instant Pay'}
+                    {language === 'so' ? (cmsConfig.stats?.tripsCompletedLabelSo || 'Safarro Guuleystay') : (cmsConfig.stats?.tripsCompletedLabelEn || 'Completed Rides')}
                   </div>
                 </div>
                 <div className="bg-slate-900/60 p-3 rounded-2xl border border-slate-800">
-                  <div className="text-lg sm:text-xl font-black text-amber-400 font-mono">1,000 SOS</div>
+                  <div className="text-lg sm:text-xl font-black text-amber-400 font-mono">
+                    {cmsConfig.stats?.customerRating || '4.9 ★'}
+                  </div>
                   <div className="text-[10px] sm:text-[11px] text-slate-400 font-bold">
-                    {language === 'so' ? 'Komishan Go’an' : 'Fixed Commission'}
+                    {language === 'so' ? (cmsConfig.stats?.customerRatingLabelSo || 'Qanacsanaanta') : (cmsConfig.stats?.customerRatingLabelEn || 'Customer Rating')}
                   </div>
                 </div>
               </div>
@@ -796,11 +814,15 @@ export const WadaageWelcomeWebsite: React.FC<WadaageWelcomeWebsiteProps> = ({
           </div>
 
           <div className="space-y-3">
-            {faqList.map((faq, idx) => {
+            {activeFaqs.map((faq, idx) => {
               const isExpanded = expandedFaq === idx;
+              const qText = (faq as any).questionSo || (faq as any).qSo;
+              const qTextEn = (faq as any).questionEn || (faq as any).qEn;
+              const aText = (faq as any).answerSo || (faq as any).aSo;
+              const aTextEn = (faq as any).answerEn || (faq as any).aEn;
               return (
                 <div
-                  key={idx}
+                  key={faq.id || idx}
                   className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden transition"
                 >
                   <button
@@ -808,7 +830,7 @@ export const WadaageWelcomeWebsite: React.FC<WadaageWelcomeWebsiteProps> = ({
                     onClick={() => setExpandedFaq(isExpanded ? null : idx)}
                     className="w-full px-5 py-4 text-left flex items-center justify-between text-xs sm:text-sm font-bold text-white hover:text-emerald-400 transition cursor-pointer"
                   >
-                    <span>{language === 'so' ? faq.qSo : faq.qEn}</span>
+                    <span>{language === 'so' ? qText : qTextEn}</span>
                     {isExpanded ? (
                       <ChevronUp className="w-4 h-4 text-emerald-400 shrink-0" />
                     ) : (
@@ -817,7 +839,7 @@ export const WadaageWelcomeWebsite: React.FC<WadaageWelcomeWebsiteProps> = ({
                   </button>
                   {isExpanded && (
                     <div className="px-5 pb-4 text-xs text-slate-300 leading-relaxed border-t border-slate-900 pt-3">
-                      {language === 'so' ? faq.aSo : faq.aEn}
+                      {language === 'so' ? aText : aTextEn}
                     </div>
                   )}
                 </div>
