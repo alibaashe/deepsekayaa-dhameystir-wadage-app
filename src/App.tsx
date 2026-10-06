@@ -31,7 +31,7 @@ const MainAppContent: React.FC = () => {
     dismissSelfOrderAlert,
   } = useRide();
 
-  // Helper to parse current URL route/view - Standalone APK & PWA priority
+  // Helper to parse current URL route/view - Clean URL paths (/admin, /driver, /rider, /)
   const getInitialView = (): AppView => {
     try {
       // 1. Build-time environment variable override
@@ -48,40 +48,38 @@ const MainAppContent: React.FC = () => {
       const pathname = window.location.pathname.toLowerCase();
       const hostname = window.location.hostname.toLowerCase();
 
-      // Explicit Admin
-      if (appParam === 'admin' || hash.includes('admin') || pathname.includes('/admin') || hostname.startsWith('admin.')) {
+      // Explicit Admin (/admin or ?app=admin)
+      if (appParam === 'admin' || hash.includes('admin') || pathname === '/admin' || pathname.startsWith('/admin/') || hostname.startsWith('admin.')) {
         try { localStorage.setItem('wadaage_app_view', 'admin'); } catch {}
         return 'admin';
       }
-      // Explicit Driver
-      if (appParam === 'driver' || hash.includes('driver') || pathname.includes('/driver') || hostname.startsWith('driver.')) {
+      // Explicit Driver (/driver or ?app=driver)
+      if (appParam === 'driver' || hash.includes('driver') || pathname === '/driver' || pathname.startsWith('/driver/') || hostname.startsWith('driver.')) {
         try { localStorage.setItem('wadaage_app_view', 'driver'); } catch {}
         return 'driver';
       }
-      // Explicit Rider
-      if (appParam === 'rider' || appParam === 'passenger' || hash.includes('rider') || pathname.includes('/rider') || hostname.startsWith('rider.')) {
+      // Explicit Rider (/rider or /passenger or ?app=rider)
+      if (
+        appParam === 'rider' ||
+        appParam === 'passenger' ||
+        hash.includes('rider') ||
+        hash.includes('passenger') ||
+        pathname === '/rider' ||
+        pathname.startsWith('/rider/') ||
+        pathname === '/passenger' ||
+        pathname.startsWith('/passenger/') ||
+        hostname.startsWith('rider.')
+      ) {
         try { localStorage.setItem('wadaage_app_view', 'rider'); } catch {}
         return 'rider';
       }
-      // Explicit Website
-      if (appParam === 'website' || appParam === 'home' || hash.includes('home') || hash.includes('website')) {
+      // Explicit Website (/website, /home, or ?app=website)
+      if (appParam === 'website' || appParam === 'home' || hash.includes('home') || hash.includes('website') || pathname === '/website' || pathname === '/home') {
         try { localStorage.setItem('wadaage_app_view', 'website'); } catch {}
         return 'website';
       }
 
-      // 3. Mobile screen / Standalone Android APK / PWA / TWA / Capacitor Detection
-      const isMobileScreen = window.innerWidth <= 768;
-      const isStandalone =
-        isMobileScreen ||
-        window.matchMedia('(display-mode: standalone)').matches ||
-        (window.navigator as any).standalone === true ||
-        typeof (window as any).Capacitor !== 'undefined' ||
-        (window as any).isNativeApp === true ||
-        document.referrer.includes('android-app://') ||
-        navigator.userAgent.includes('WadaageRider') ||
-        navigator.userAgent.includes('WadaageDriver');
-
-      // 4. Active Trip Check: If rider has an active trip in progress, always redirect to rider view so session is not lost
+      // 3. Active Trip Check: If rider has an active trip in progress, keep session in rider view
       try {
         const savedRide = localStorage.getItem('wadaage_current_ride');
         if (savedRide) {
@@ -92,23 +90,16 @@ const MainAppContent: React.FC = () => {
         }
       } catch {}
 
-      const storedView = localStorage.getItem('wadaage_app_view') as AppView | null;
-      const storedRole = localStorage.getItem('wadaage_role');
-
-      if (storedView === 'driver' || storedRole === 'driver' || navigator.userAgent.includes('WadaageDriver')) {
+      // 4. Standalone Native Android APK User-Agent override
+      if (navigator.userAgent.includes('WadaageDriver')) {
         return 'driver';
       }
-      if (storedView === 'rider' || storedRole === 'passenger' || navigator.userAgent.includes('WadaageRider')) {
+      if (navigator.userAgent.includes('WadaageRider')) {
         return 'rider';
       }
 
-      // Default mobile users to Rider app directly
-      if (isStandalone) {
-        return 'rider';
-      }
-
-      // 5. For regular desktop web visitors, default to rider app or stored view
-      return storedView || 'rider';
+      // 5. Default root domain (wadaage.com /) is the Welcome Website!
+      return 'website';
     } catch {
       return 'website';
     }
@@ -187,9 +178,17 @@ const MainAppContent: React.FC = () => {
       localStorage.setItem('wadaage_app_view', target);
       const url = new URL(window.location.href);
       if (target === 'website') {
-        url.searchParams.set('app', 'website');
-      } else {
-        url.searchParams.set('app', target);
+        url.pathname = '/';
+        url.searchParams.delete('app');
+      } else if (target === 'rider') {
+        url.pathname = '/rider';
+        url.searchParams.set('app', 'rider');
+      } else if (target === 'driver') {
+        url.pathname = '/driver';
+        url.searchParams.set('app', 'driver');
+      } else if (target === 'admin') {
+        url.pathname = '/admin';
+        url.searchParams.set('app', 'admin');
       }
       window.history.pushState({}, '', url.toString());
     } catch {}
@@ -391,6 +390,32 @@ const MainAppContent: React.FC = () => {
   if (!isAdminLoggedIn) {
     return (
       <div className="min-h-screen bg-[#021812] text-slate-100 flex flex-col items-center justify-center p-4">
+        <div className="w-full max-w-md mb-4 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => navigateTo('website')}
+            className="text-xs font-bold text-emerald-400 hover:text-emerald-300 flex items-center space-x-1.5 bg-slate-900/60 hover:bg-slate-900 px-3 py-1.5 rounded-xl border border-emerald-500/30 transition cursor-pointer"
+          >
+            <span>&larr;</span>
+            <span>wadaage.com</span>
+          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              type="button"
+              onClick={() => navigateTo('rider')}
+              className="text-[11px] font-bold text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-900/40 hover:bg-slate-800 transition cursor-pointer"
+            >
+              Rider
+            </button>
+            <button
+              type="button"
+              onClick={() => navigateTo('driver')}
+              className="text-[11px] font-bold text-amber-400 hover:text-amber-300 px-2.5 py-1 rounded-lg bg-slate-900/40 hover:bg-slate-800 transition cursor-pointer"
+            >
+              Driver
+            </button>
+          </div>
+        </div>
         <div className="max-w-md w-full bg-[#002418] border border-[#00E575]/30 rounded-3xl p-6 shadow-2xl">
           <LoginScreen />
         </div>
