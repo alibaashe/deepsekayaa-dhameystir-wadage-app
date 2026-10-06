@@ -2953,7 +2953,7 @@ Return ONLY valid JSON matching this schema:
     });
   });
 
-  // --- VITE MIDDLEWARE SETUP ---
+  // --- VITE / STATIC FILE SETUP ---
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -2961,10 +2961,26 @@ Return ONLY valid JSON matching this schema:
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
+    const possibleDistPaths = [
+      path.join(process.cwd(), 'dist'),
+      __dirname,
+      path.resolve(__dirname, '..', 'dist'),
+      path.resolve(__dirname),
+      '/var/www/wadaage/dist',
+    ];
+    const distPath = possibleDistPaths.find((p) => fs.existsSync(path.join(p, 'index.html'))) || path.join(process.cwd(), 'dist');
+
     app.use(express.static(distPath));
-    app.get('*', (_req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+    app.get('*', (req, res) => {
+      if (req.path.startsWith('/api')) {
+        return res.status(404).json({ error: 'API endpoint not found', path: req.path });
+      }
+      const indexPath = path.join(distPath, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(200).send(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Wadaage</title></head><body><div id="root">Starting Wadaage...</div></body></html>`);
+      }
     });
   }
 
