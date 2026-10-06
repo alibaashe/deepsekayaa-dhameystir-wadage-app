@@ -488,8 +488,27 @@ export const LoginScreen: React.FC = () => {
           if (existingRider) {
             setIsSubmitting(false);
             setFormError(language === 'so'
-              ? 'Lambarkani hore ayuu u diiwaangashanaa. Fadlan gal akoonkaaga (Please login instead).'
-              : 'This phone number is already registered. Please login instead.');
+              ? 'Lambarkani hore ayuu u diiwaangashanaa. Lambar kasta waa inuu u gaar yahay hal qof.'
+              : 'This phone number is already registered and must be unique.');
+            return;
+          }
+
+          // Duplicate name check for Rider
+          const allStoredRiders = (() => {
+            try {
+              const r1 = JSON.parse(localStorage.getItem('wadaage_registered_users') || '[]');
+              const r2 = JSON.parse(localStorage.getItem('wadaage_user_management_records') || '[]');
+              return [...r1, ...r2];
+            } catch { return []; }
+          })();
+          const isDuplicateRiderName = allStoredRiders.some(
+            (r: any) => r.name && r.name.trim().toLowerCase() === fullName.trim().toLowerCase()
+          );
+          if (isDuplicateRiderName) {
+            setIsSubmitting(false);
+            setFormError(language === 'so'
+              ? 'Magacan rakaabka hore ayaa loo qaatay. Fadlan qor magacaaga oo saddexan si uu u noqdo mid u gaar ah hal qof.'
+              : 'Name is already in use. Please enter your full unique name.');
             return;
           }
 
@@ -590,7 +609,26 @@ export const LoginScreen: React.FC = () => {
             return;
           }
 
-          // Duplicate driver phone check: only block if this driver is already APPROVED by Admin
+          // Duplicate driver name check
+          const allStoredDrivers = (() => {
+            try {
+              const d1 = JSON.parse(localStorage.getItem('wadaage_drivers') || '[]');
+              const d2 = JSON.parse(localStorage.getItem('wadaage_user_management_records') || '[]');
+              return [...d1, ...d2];
+            } catch { return []; }
+          })();
+          const isDuplicateDriverName = allStoredDrivers.some(
+            (d: any) => d.name && d.name.trim().toLowerCase() === fullName.trim().toLowerCase()
+          );
+          if (isDuplicateDriverName) {
+            setIsSubmitting(false);
+            setFormError(language === 'so'
+              ? 'Magacan darawalka hore ayaa loo qaatay. Fadlan qor magacaaga oo saddexan si uu u noqdo mid u gaar ah.'
+              : 'Driver name is already in use. Please enter your full unique 3-part name.');
+            return;
+          }
+
+          // Duplicate driver phone check: only block if this driver is already registered/approved
           const { driver: existingDriver, application: existingApp } = findDriverRecord(cleanPhone);
           const isAlreadyApproved = existingDriver?.isVerified === true && existingDriver?.kycStatus === 'approved';
           if (isAlreadyApproved) {

@@ -994,7 +994,7 @@ export const DriverDashboard: React.FC = () => {
                               <span className="text-[10px] text-amber-400 font-bold">★ {d.rating}</span>
                             </div>
                             <div className="text-[11px] text-slate-500 font-medium">
-                              {d.vehicle.model} • <span className="text-emerald-500 font-bold">{d.status}</span>
+                              {d.vehicle?.model || (d as any)?.vehicle_model || 'Toyota Vitz'} • <span className="text-emerald-500 font-bold">{d.status}</span>
                             </div>
                           </div>
                         </div>

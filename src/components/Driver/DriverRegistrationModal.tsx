@@ -108,10 +108,15 @@ export const DriverRegistrationModal: React.FC<DriverRegistrationModalProps> = (
       return;
     }
 
-    const isAlreadyApprovedDriver = drivers.some(d => d.phone && isPhoneMatch(d.phone, cleanDigits) && d.isVerified === true && d.kycStatus === 'approved');
-
+    const isAlreadyApprovedDriver = drivers.some(d => d.phone && isPhoneMatch(d.phone, cleanDigits));
     if (isAlreadyApprovedDriver) {
-      setErrorMessage('This phone number is already registered and approved as a Wadaage Driver. Please login instead.');
+      setErrorMessage('Lambarkani hore ayuu u diiwaangashanaa. Lambar kasta waa inuu noqdaa mid u gaar ah hal qof (This phone number is already registered and must be unique).');
+      return;
+    }
+
+    const isDuplicateName = drivers.some(d => d.name && d.name.trim().toLowerCase() === formData.fullName.trim().toLowerCase());
+    if (isDuplicateName) {
+      setErrorMessage('Magacan darawalka hore ayaa loo isticmaalay. Fadlan qor magacaaga oo saddexan si uu u noqdo mid u gaar ah (Driver name must be unique. Please use your full 3-part name).');
       return;
     }
 

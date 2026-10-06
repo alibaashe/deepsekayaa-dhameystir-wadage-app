@@ -137,9 +137,9 @@ export const ChatModal: React.FC<ChatModalProps> = ({ onClose, viewerRole }) => 
               <p className="text-[11px] text-slate-300 font-medium truncate flex items-center gap-1 mt-0.5">
                 {activeViewerRole === 'passenger' ? (
                   <>
-                    <span>{assignedDriver.vehicle.model}</span>
+                    <span>{assignedDriver?.vehicle?.model || (assignedDriver as any)?.vehicle_model || 'Toyota Vitz'}</span>
                     <span>•</span>
-                    <span className="font-mono font-bold text-emerald-400">{assignedDriver.vehicle.licensePlate}</span>
+                    <span className="font-mono font-bold text-emerald-400">{assignedDriver?.vehicle?.licensePlate || (assignedDriver as any)?.vehicle_plate || 'SL-101'}</span>
                   </>
                 ) : (
                   <>

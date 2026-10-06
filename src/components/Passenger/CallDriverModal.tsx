@@ -77,7 +77,7 @@ export const CallDriverModal: React.FC<CallDriverModalProps> = ({ onClose }) => 
         <div>
           <h3 className="text-xl font-black text-white">{assignedDriver.name}</h3>
           <p className="text-xs text-slate-400 font-medium mt-1">
-            {assignedDriver.vehicle.model} • <span className="font-mono text-emerald-400 font-bold">{assignedDriver.vehicle.licensePlate}</span>
+            {assignedDriver?.vehicle?.model || (assignedDriver as any)?.vehicle_model || 'Toyota Vitz'} • <span className="font-mono text-emerald-400 font-bold">{assignedDriver?.vehicle?.licensePlate || (assignedDriver as any)?.vehicle_plate || 'SL-101'}</span>
           </p>
           <p className="text-xs font-mono text-slate-300 font-bold mt-1">
             📞 {assignedDriver.phone}

@@ -1901,7 +1901,11 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // 1. Gather all candidate alias keys related to this driver
     const candidateKeys = new Set<string>();
     candidateKeys.add(identifier);
-    if (cleanInput) candidateKeys.add(cleanInput);
+    if (cleanInput) {
+      candidateKeys.add(cleanInput);
+      candidateKeys.add(`+252${cleanInput}`);
+      candidateKeys.add(`+252 ${cleanInput}`);
+    }
 
     // Search in drivers array for matching driver
     const matchedDrv = drivers.find((d) => {
@@ -1945,72 +1949,92 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    // 2. Calculate authoritative net balance from driverWalletTransactions ledger if available
-    let ledgerSumUsd = 0;
-    let hasLedgerTransactions = false;
-
-    if (driverWalletTransactions && driverWalletTransactions.length > 0) {
-      driverWalletTransactions.forEach((tx) => {
-        const isCompleted = tx.status === 'completed';
-        if (!isCompleted) return;
-
-        const isMatch =
-          (tx.driverId && candidateKeys.has(tx.driverId)) ||
-          (tx.driverPhone && candidateKeys.has(tx.driverPhone)) ||
-          (tx.driverPhone && cleanInput && tx.driverPhone.replace(/\D/g, '').endsWith(cleanInput));
-
-        if (isMatch) {
-          hasLedgerTransactions = true;
-          ledgerSumUsd += Number(tx.amountUsd || 0);
-        }
-      });
-    }
-
-    // 3. Evaluate map and driver record balances
+    // 2. Check explicit driverWallets map
     let mapBal: number | null = null;
     for (const key of candidateKeys) {
       if (driverWallets[key] !== undefined) {
         const val = Number(driverWallets[key]);
-        if (!isNaN(val)) {
+        if (!isNaN(val) && val > 0) {
           mapBal = val;
-          break; // First direct alias hit in the driverWallets map is authoritative
+          break;
         }
       }
     }
 
-    if (mapBal === null && matchedDrv) {
-      const drvBalUsd = matchedDrv.walletBalanceUsd !== undefined
+    // 3. Calculate authoritative net balance from completed driverWalletTransactions ledger
+    let ledgerSumUsd = 0;
+    let hasCompletedTx = false;
+
+    if (driverWalletTransactions && driverWalletTransactions.length > 0) {
+      driverWalletTransactions.forEach((tx) => {
+        const status = String(tx.status || '').toLowerCase();
+        if (status !== 'completed' && status !== 'verified') return;
+
+        const isMatch =
+          (tx.driverId && candidateKeys.has(tx.driverId)) ||
+          (tx.driverPhone && candidateKeys.has(tx.driverPhone)) ||
+          (tx.driverPhone && cleanInput && tx.driverPhone.replace(/\D/g, '').endsWith(cleanInput)) ||
+          (tx.driverId && cleanInput && tx.driverId.replace(/\D/g, '').endsWith(cleanInput));
+
+        if (isMatch) {
+          hasCompletedTx = true;
+          const amt = Number(tx.amountUsd ?? (tx.amountSos ? tx.amountSos / 10000 : 0));
+          const tType = String(tx.type || '').toLowerCase();
+          if (tType === 'commission_deduction' || tType === 'commission') {
+            ledgerSumUsd -= amt;
+          } else {
+            ledgerSumUsd += amt;
+          }
+        }
+      });
+    }
+
+    // 4. Check driver object in drivers array
+    let drvObjBal: number | null = null;
+    if (matchedDrv) {
+      const val = matchedDrv.walletBalanceUsd !== undefined
         ? Number(matchedDrv.walletBalanceUsd)
         : (matchedDrv as any).wallet_balance_usd !== undefined
         ? Number((matchedDrv as any).wallet_balance_usd)
         : undefined;
-
-      if (drvBalUsd !== undefined && !isNaN(drvBalUsd)) {
-        mapBal = drvBalUsd;
+      if (val !== undefined && !isNaN(val) && val > 0) {
+        drvObjBal = val;
       }
     }
 
-    if (mapBal === null && currentUser && currentUser.role === 'driver') {
-      const userBalUsd = currentUser.walletBalanceUsd !== undefined
+    // 5. Check currentUser if driver
+    let userBal: number | null = null;
+    if (currentUser && currentUser.role === 'driver') {
+      const val = currentUser.walletBalanceUsd !== undefined
         ? Number(currentUser.walletBalanceUsd)
         : (currentUser as any).wallet_balance_usd !== undefined
         ? Number((currentUser as any).wallet_balance_usd)
         : undefined;
-
-      if (userBalUsd !== undefined && !isNaN(userBalUsd)) {
-        mapBal = userBalUsd;
+      if (val !== undefined && !isNaN(val) && val > 0) {
+        userBal = val;
       }
     }
 
-    if (mapBal !== null) {
-      return Math.max(0, Math.round(mapBal * 100) / 100);
+    // Authoritative resolution: prioritize positive verified balance across active sources
+    const candidates = [
+      mapBal,
+      hasCompletedTx ? Math.max(0, ledgerSumUsd) : null,
+      drvObjBal,
+      userBal,
+    ].filter((v): v is number => v !== null && !isNaN(v));
+
+    if (candidates.length > 0) {
+      const resolved = Math.max(...candidates);
+      return Math.round(resolved * 100) / 100;
     }
 
-    if (hasLedgerTransactions) {
-      return Math.max(0, Math.round(ledgerSumUsd * 100) / 100);
+    // Direct check if mapBal is explicitly 0
+    for (const key of candidateKeys) {
+      if (driverWallets[key] !== undefined) {
+        return Math.max(0, Number(driverWallets[key]) || 0);
+      }
     }
 
-    // Default: strictly 0.00 if unrecorded or drained
     return 0.00;
   }, [driverWallets, drivers, currentUser, driverWalletTransactions]);
 
@@ -2901,31 +2925,40 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const targetId = driverId || driverPhone || tx?.driverId || tx?.driverPhone;
         const txStatus = String(tx?.status || '').toLowerCase();
         const isTxCompleted = !tx || txStatus === 'completed' || txStatus === 'verified';
-        if (targetId && isTxCompleted) {
-          if (newBalanceUsd !== undefined) {
-            applyDriverBalanceUpdate(driverId || tx?.driverId || targetId, driverPhone || tx?.driverPhone, Number(newBalanceUsd), true);
-          } else if (amountUsd) {
-            applyDriverBalanceUpdate(driverId || tx?.driverId || targetId, driverPhone || tx?.driverPhone, Number(amountUsd), false);
-          }
-        }
 
         if (tx) {
           setDriverWalletTransactions((prev) => {
             const idx = prev.findIndex((t) => t.id === tx.id);
+            let updated: DriverWalletTransaction[];
             if (idx >= 0) {
-              const updated = [...prev];
-              updated[idx] = tx;
-              return updated;
+              updated = [...prev];
+              updated[idx] = { ...updated[idx], ...tx, status: 'completed' };
+            } else {
+              updated = [{ ...tx, status: 'completed' }, ...prev];
             }
-            return [tx, ...prev];
+            try {
+              localStorage.setItem('wadaage_driver_wallet_transactions', JSON.stringify(updated));
+            } catch (_e) {}
+            return updated;
           });
+        }
+
+        if (targetId && isTxCompleted) {
+          const amt = Number(amountUsd || tx?.amountUsd || (tx?.amountSos ? tx.amountSos / 10000 : 0));
+          if (newBalanceUsd !== undefined && Number(newBalanceUsd) > 0) {
+            applyDriverBalanceUpdate(driverId || tx?.driverId || targetId, driverPhone || tx?.driverPhone, Number(newBalanceUsd), true);
+          } else if (amt > 0) {
+            applyDriverBalanceUpdate(driverId || tx?.driverId || targetId, driverPhone || tx?.driverPhone, amt, false);
+          }
         }
       } else if (type === 'DRIVER_TOPUP_REQUESTED') {
         const { tx } = payload || {};
         if (tx) {
           setDriverWalletTransactions((prev) => {
             if (prev.some((t) => t.id === tx.id)) return prev;
-            return [tx, ...prev];
+            const updated = [tx, ...prev];
+            try { localStorage.setItem('wadaage_driver_wallet_transactions', JSON.stringify(updated)); } catch (_e) {}
+            return updated;
           });
         }
       }
@@ -2966,7 +2999,25 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
             }
           });
-          return Array.from(map.values());
+          const merged = Array.from(map.values());
+          try {
+            localStorage.setItem('wadaage_driver_wallet_transactions', JSON.stringify(merged));
+          } catch (_e) {}
+          return merged;
+        });
+
+        // For any completed transaction in remoteTxs, ensure driver wallet map has credit
+        remoteTxs.forEach((tx) => {
+          const s = String(tx.status || '').toLowerCase();
+          if (s === 'completed' || s === 'verified') {
+            const targetId = tx.driverId || tx.driverPhone;
+            if (targetId) {
+              const amt = Number(tx.amountUsd ?? (tx.amountSos ? tx.amountSos / 10000 : 0));
+              if (amt > 0) {
+                applyDriverBalanceUpdate(targetId, tx.driverPhone, amt, false);
+              }
+            }
+          }
         });
       }
     });
@@ -3402,10 +3453,15 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Admin verifies and controls real amount received for driver top-up (strictly isolates to the targeted driver only)
   const verifyAndApproveDriverTopUp = (txId: string, realAmountSosInput?: number, adminNote?: string) => {
-    setDriverWalletTransactions((prev) =>
-      prev.map((tx) => {
+    let approvedTxObj: DriverWalletTransaction | null = null;
+    let targetDriverId = '';
+    let targetDriverPhone = '';
+    let creditedUsd = 0;
+    let creditedSos = 0;
+
+    setDriverWalletTransactions((prev) => {
+      const updatedList = prev.map((tx) => {
         if (tx.id === txId) {
-          // Atomic Lock Guard: Prevent double-execution if transaction is already completed or verified
           const curStatus = String(tx.status || '').toLowerCase();
           if (curStatus === 'completed' || curStatus === 'verified') {
             return tx;
@@ -3413,10 +3469,10 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           const finalSos = realAmountSosInput && realAmountSosInput > 0 ? realAmountSosInput : tx.amountSos;
           const finalUsd = Math.round((finalSos / 10000) * 100) / 100;
-          const targetDriverId = tx.driverId || 'drv_01';
-
-          // Apply balance update across all key aliases
-          const calculatedNewBalUsd = applyDriverBalanceUpdate(targetDriverId, tx.driverPhone, finalUsd, false);
+          targetDriverId = tx.driverId || 'drv_01';
+          targetDriverPhone = tx.driverPhone || '';
+          creditedUsd = finalUsd;
+          creditedSos = finalSos;
 
           const approvedTx: DriverWalletTransaction = {
             ...tx,
@@ -3427,29 +3483,44 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
             verificationMethod: 'admin_confirmation',
             adminNote: adminNote || `Verified by Admin. Real amount credited: ${finalSos.toLocaleString()} SLSH ($${finalUsd.toFixed(2)} USD) to driver ${tx.driverName || targetDriverId}.`,
           };
-          saveTransactionToFirestore(approvedTx);
-          fetch(getApiUrl('/api/db/wallet-transactions'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              ...approvedTx,
-              alreadyCreditedOnFrontend: true,
-              newBalanceUsd: calculatedNewBalUsd,
-            }),
-          }).catch(() => {});
-          broadcastRideEvent('DRIVER_WALLET_UPDATED', {
-            driverId: targetDriverId,
-            driverPhone: tx.driverPhone,
-            amountUsd: finalUsd,
-            amountSos: finalSos,
-            newBalanceUsd: calculatedNewBalUsd,
-            tx: approvedTx,
-          });
+          approvedTxObj = approvedTx;
           return approvedTx;
         }
         return tx;
-      })
-    );
+      });
+
+      try {
+        localStorage.setItem('wadaage_driver_wallet_transactions', JSON.stringify(updatedList));
+      } catch (_e) {}
+
+      return updatedList;
+    });
+
+    if (approvedTxObj) {
+      const approvedTx: DriverWalletTransaction = approvedTxObj;
+      // Apply balance update across all key aliases
+      const calculatedNewBalUsd = applyDriverBalanceUpdate(targetDriverId, targetDriverPhone, creditedUsd, false);
+
+      saveTransactionToFirestore(approvedTx);
+      fetch(getApiUrl('/api/db/wallet-transactions'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...approvedTx,
+          alreadyCreditedOnFrontend: true,
+          newBalanceUsd: calculatedNewBalUsd,
+        }),
+      }).catch(() => {});
+
+      broadcastRideEvent('DRIVER_WALLET_UPDATED', {
+        driverId: targetDriverId,
+        driverPhone: targetDriverPhone,
+        amountUsd: creditedUsd,
+        amountSos: creditedSos,
+        newBalanceUsd: calculatedNewBalUsd,
+        tx: approvedTx,
+      });
+    }
   };
 
   const rejectDriverPendingTransaction = (txId: string, adminNote?: string) => {
@@ -4899,15 +4970,16 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem('wadaage_driver_trip_history');
     } catch {}
 
-    // Initialize fresh $0.00 wallet balance for new driver across all key aliases
+    // Preserve existing wallet balance if driver already has funds, else initialize 0.00
+    const existingBal = getDriverWalletBalance(newDriverUser.id) || getDriverWalletBalance(cleanPhone) || 0.00;
     setDriverWallets((prev) => {
       const updated = {
         ...prev,
-        [newDriverUser.id]: 0.00,
-        [newDriverUser.phone]: 0.00,
-        [cleanPhone]: 0.00,
-        [`+252 ${cleanPhone}`]: 0.00,
-        [`+252${cleanPhone}`]: 0.00,
+        [newDriverUser.id]: existingBal,
+        [newDriverUser.phone]: existingBal,
+        [cleanPhone]: existingBal,
+        [`+252 ${cleanPhone}`]: existingBal,
+        [`+252${cleanPhone}`]: existingBal,
       };
       try {
         localStorage.setItem('wadaage_driver_wallets_map', JSON.stringify(updated));
@@ -4927,8 +4999,8 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
       status: isAutoApproved ? 'available' : 'offline',
       isVerified: isAutoApproved,
       kycStatus: isAutoApproved ? 'approved' : 'pending',
-      walletBalanceUsd: 0.00,
-      wallet_balance_usd: 0.00,
+      walletBalanceUsd: existingBal,
+      wallet_balance_usd: existingBal,
       documentsVerified: {
         driverLicense: isAutoApproved,
         vehicleInsurance: isAutoApproved,

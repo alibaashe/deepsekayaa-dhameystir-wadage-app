@@ -486,7 +486,7 @@ export const FiveManagersControlPanel: React.FC<FiveManagersControlPanelProps> =
                         <div>
                           <h4 className="font-bold text-white">{drv.name}</h4>
                           <p className="text-[10px] text-slate-400">
-                            {drv.vehicle.model} ({drv.vehicle.licensePlate})
+                            {drv.vehicle?.model || (drv as any)?.vehicle_model || 'Toyota Vitz'} ({drv.vehicle?.licensePlate || (drv as any)?.vehicle_plate || (drv as any)?.car_plate || 'SL-101'})
                           </p>
                         </div>
                       </div>

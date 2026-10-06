@@ -128,7 +128,7 @@ export const AppInfoWalletModal: React.FC<AppInfoWalletModalProps> = ({ isOpen, 
                 <div>
                   <h4 className="font-extrabold text-sm text-white">{currentDriver.name}</h4>
                   <p className="text-[10px] text-slate-400">
-                    {currentDriver.vehicle.model} • <span className="font-mono text-emerald-400">{currentDriver.vehicle.licensePlate}</span>
+                    {currentDriver.vehicle?.model || (currentDriver as any)?.vehicle_model || 'Toyota Vitz'} • <span className="font-mono text-emerald-400">{currentDriver.vehicle?.licensePlate || (currentDriver as any)?.vehicle_plate || 'SL-101'}</span>
                   </p>
                 </div>
               </div>

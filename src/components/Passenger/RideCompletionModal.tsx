@@ -174,7 +174,7 @@ export const RideCompletionModal: React.FC = () => {
               <div className="text-xs font-bold text-slate-900 dark:text-white">
                 {language === 'so' ? `Sidee u aragtay duuliyaha ${assignedDriver.name}?` : `How was your ride with ${assignedDriver.name}?`}
               </div>
-              <div className="text-[10px] text-slate-400 font-medium">{assignedDriver.vehicle.model} • {assignedDriver.vehicle.licensePlate}</div>
+              <div className="text-[10px] text-slate-400 font-medium">{assignedDriver?.vehicle?.model || (assignedDriver as any)?.vehicle_model || 'Toyota Vitz'} • {assignedDriver?.vehicle?.licensePlate || (assignedDriver as any)?.vehicle_plate || 'SL-101'}</div>
             </div>
           </div>
 

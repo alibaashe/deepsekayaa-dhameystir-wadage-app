@@ -1025,59 +1025,71 @@ Return ONLY valid JSON matching this schema:
     // Direct Asynchronous Sync to Live Hostinger MySQL database
     dbService.syncTransactionToMySQL(tx).catch(() => {});
 
-    // Sync updated driver wallet balance in memory store & MySQL ONLY IF newly completed
+    // Sync updated driver wallet balance in memory store & MySQL when completed/verified
     let updatedDriver: any = null;
-    if (isNewCompletion && (tx.driverId || tx.driverPhone)) {
-      const cleanPhone = String(tx.driverPhone || '').replace(/\D/g, '');
-      const driver = dbService.store.drivers.find(
-        (d: any) =>
-          d.id === tx.driverId ||
-          (tx.driverPhone && d.phone === tx.driverPhone) ||
-          (cleanPhone && d.phone && String(d.phone).replace(/\D/g, '') === cleanPhone)
-      );
-      if (driver) {
-        const curBal = Number(driver.wallet_balance_usd ?? driver.walletBalanceUsd ?? 0);
-        const delta = Number(tx.amountUsd ?? tx.amount_usd ?? 0);
-        const newBal = Math.max(0, Math.round((curBal + delta) * 100) / 100);
-        driver.wallet_balance_usd = newBal;
-        driver.walletBalanceUsd = newBal;
-        if (newBal < 0.10) {
-          driver.status = 'offline';
-          driver.is_online = 0;
-        }
-        updatedDriver = driver;
-        dbService.syncDriverToMySQL(driver).catch(() => {});
-      }
-    }
+    const targetDriverId = tx.driverId || req.body.driverId || req.body.user_id || '';
+    const targetDriverPhone = tx.driverPhone || req.body.driverPhone || '';
+    const cleanPhone = targetDriverPhone ? targetDriverPhone.replace(/\D/g, '') : '';
+    const targetDriverName = tx.driverName || req.body.driverName || 'Driver Partner';
 
-    // Direct Override Balance set if provided (ONLY for completed/verified transactions, never pending)
-    if (
-      (currentStatus === 'completed' || currentStatus === 'verified') &&
-      req.body.newBalanceUsd !== undefined &&
-      (tx.driverId || tx.driverPhone || req.body.driverName)
-    ) {
-      const cleanPhone = String(tx.driverPhone || req.body.driverPhone || '').replace(/\D/g, '');
-      const targetDriverId = tx.driverId || req.body.driverId || req.body.user_id;
-      const targetDriverName = req.body.driverName || tx.driverName;
-
-      const driver = dbService.store.drivers.find(
+    if (currentStatus === 'completed' || currentStatus === 'verified') {
+      let driver = dbService.store.drivers.find(
         (d: any) =>
           (targetDriverId && (d.id === targetDriverId || d.user_id === targetDriverId)) ||
-          (tx.driverPhone && d.phone === tx.driverPhone) ||
+          (targetDriverPhone && d.phone === targetDriverPhone) ||
+          (cleanPhone && d.phone && String(d.phone).replace(/\D/g, '') === cleanPhone) ||
           (cleanPhone && d.phone && String(d.phone).replace(/\D/g, '').endsWith(cleanPhone)) ||
-          (targetDriverName && d.name && d.name.toLowerCase().includes(String(targetDriverName).toLowerCase())) ||
-          (targetDriverId && d.name && d.name.toLowerCase().includes(String(targetDriverId).toLowerCase()))
+          (targetDriverName && d.name && d.name.toLowerCase() === String(targetDriverName).toLowerCase())
       );
+
+      const deltaUsd = Number(tx.amountUsd ?? tx.amount_usd ?? (tx.amountSos ? tx.amountSos / 10000 : 0));
+      let finalBalanceUsd = 0;
+
       if (driver) {
-        const targetBal = Number(req.body.newBalanceUsd);
-        driver.wallet_balance_usd = targetBal;
-        driver.walletBalanceUsd = targetBal;
-        if (targetBal < 0.10) {
-          driver.status = 'offline';
-          driver.is_online = 0;
+        if (req.body.newBalanceUsd !== undefined && Number(req.body.newBalanceUsd) > 0) {
+          finalBalanceUsd = Number(req.body.newBalanceUsd);
+        } else if (!wasAlreadyCompleted) {
+          const curBal = Number(driver.wallet_balance_usd ?? driver.walletBalanceUsd ?? 0);
+          finalBalanceUsd = Math.max(0, Math.round((curBal + deltaUsd) * 100) / 100);
+        } else {
+          finalBalanceUsd = Number(driver.wallet_balance_usd ?? driver.walletBalanceUsd ?? deltaUsd);
+        }
+        driver.wallet_balance_usd = finalBalanceUsd;
+        driver.walletBalanceUsd = finalBalanceUsd;
+        if (finalBalanceUsd >= 0.10) {
+          driver.status = 'available';
+          driver.is_online = 1;
         }
         updatedDriver = driver;
         dbService.syncDriverToMySQL(driver).catch(() => {});
+      } else if (targetDriverId || targetDriverPhone) {
+        // Driver not in database yet - create registered driver record with top-up balance
+        finalBalanceUsd = req.body.newBalanceUsd !== undefined && Number(req.body.newBalanceUsd) > 0
+          ? Number(req.body.newBalanceUsd)
+          : Math.max(0, deltaUsd);
+
+        const newDrv = {
+          id: targetDriverId || `drv_${Date.now()}`,
+          user_id: targetDriverId || `drv_${Date.now()}`,
+          name: targetDriverName,
+          phone: targetDriverPhone,
+          wallet_balance_usd: finalBalanceUsd,
+          walletBalanceUsd: finalBalanceUsd,
+          status: finalBalanceUsd >= 0.10 ? 'available' : 'offline',
+          is_online: finalBalanceUsd >= 0.10 ? 1 : 0,
+          is_verified: 1,
+          kyc_status: 'approved',
+          rating: 5.0,
+          total_trips: 0,
+          vehicle_model: 'Toyota Vitz',
+          vehicle_plate: 'SL-101',
+          vehicle_category: 'wadaage_taxi',
+          current_lat: 9.5600,
+          current_lng: 44.0650,
+        };
+        dbService.store.drivers.unshift(newDrv);
+        updatedDriver = newDrv;
+        dbService.syncDriverToMySQL(newDrv).catch(() => {});
       }
     }
 

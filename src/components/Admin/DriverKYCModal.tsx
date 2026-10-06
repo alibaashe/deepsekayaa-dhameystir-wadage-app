@@ -66,10 +66,12 @@ export const DriverKYCModal: React.FC<DriverKYCModalProps> = ({ isOpen, onClose 
                         {driver.isVerified ? 'VERIFIED' : 'KYC PENDING'}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-500">{driver.vehicle.model} ({driver.vehicle.licensePlate})</p>
+                    <p className="text-[11px] text-slate-500">
+                      {driver.vehicle?.model || (driver as any)?.vehicle_model || 'Toyota Vitz'} ({driver.vehicle?.licensePlate || (driver as any)?.vehicle_plate || 'SL-101'})
+                    </p>
                     <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-400">
-                      <span>License: {driver.documentsVerified.driverLicense ? '✅ Verified' : '❌ Pending'}</span>
-                      <span>Insurance: {driver.documentsVerified.vehicleInsurance ? '✅ Active' : '⚠️ Due'}</span>
+                      <span>License: {driver.documentsVerified?.driverLicense ? '✅ Verified' : '❌ Pending'}</span>
+                      <span>Insurance: {driver.documentsVerified?.vehicleInsurance ? '✅ Active' : '⚠️ Due'}</span>
                     </div>
                   </div>
                 </div>

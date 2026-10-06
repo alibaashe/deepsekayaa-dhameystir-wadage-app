@@ -354,6 +354,7 @@ export const UserManagementTable: React.FC = React.memo(() => {
   const [formPhone, setFormPhone] = useState('');
   const [formRole, setFormRole] = useState<'Passenger' | 'Driver' | 'Sub-Admin'>('Passenger');
   const [formPassword, setFormPassword] = useState('');
+  const [formModalError, setFormModalError] = useState<string | null>(null);
 
   const handleGeneratePassword = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
@@ -408,6 +409,7 @@ export const UserManagementTable: React.FC = React.memo(() => {
     setFormPhone('');
     setFormRole('Passenger');
     setFormPassword('');
+    setFormModalError(null);
     setIsModalOpen(true);
   };
 
@@ -418,6 +420,7 @@ export const UserManagementTable: React.FC = React.memo(() => {
     setFormPhone(u.phone);
     setFormRole(u.role);
     setFormPassword('');
+    setFormModalError(null);
     setIsModalOpen(true);
   };
 
@@ -437,7 +440,37 @@ export const UserManagementTable: React.FC = React.memo(() => {
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formName.trim()) return;
+    setFormModalError(null);
+    const trimmedName = formName.trim();
+    if (!trimmedName) {
+      setFormModalError('Fadlan qor magaca buuxa (Please enter full name).');
+      return;
+    }
+
+    // Unique Name check (case-insensitive)
+    const isDuplicateName = users.some(
+      (u) => (editingUser ? u.id !== editingUser.id : true) &&
+             u.name &&
+             u.name.trim().toLowerCase() === trimmedName.toLowerCase()
+    );
+    if (isDuplicateName) {
+      setFormModalError('Magacan hore ayaa loo isticmaalay. Magac kasta waa inuu noqdaa mid u gaar ah hal qof (Name must be unique. A user with this name already exists).');
+      return;
+    }
+
+    // Unique Phone check
+    const cleanFormPhone = formPhone.replace(/\D/g, '');
+    if (cleanFormPhone && cleanFormPhone.length >= 7) {
+      const isDuplicatePhone = users.some(
+        (u) => (editingUser ? u.id !== editingUser.id : true) &&
+               u.phone &&
+               u.phone.replace(/\D/g, '') === cleanFormPhone
+      );
+      if (isDuplicatePhone) {
+        setFormModalError('Lambarkan taleefanka hore ayaa loo diiwaangeliyay. Lambar kasta waa inuu u gaar yahay hal qof (Phone number must be unique. Another account has this number).');
+        return;
+      }
+    }
 
     let targetUserId = '';
 
@@ -445,7 +478,7 @@ export const UserManagementTable: React.FC = React.memo(() => {
       targetUserId = editingUser.id;
       const updatedUser: UserRecord = {
         ...editingUser,
-        name: formName.trim(),
+        name: trimmedName,
         email: formEmail.trim(),
         phone: formPhone.trim(),
         role: formRole,
@@ -469,8 +502,8 @@ export const UserManagementTable: React.FC = React.memo(() => {
       targetUserId = `usr_${Date.now()}`;
       const newUser: UserRecord = {
         id: targetUserId,
-        name: formName.trim(),
-        email: formEmail.trim() || `${formName.trim().toLowerCase().replace(/\s+/g, '.')}@wadaage.com`,
+        name: trimmedName,
+        email: formEmail.trim() || `${trimmedName.toLowerCase().replace(/\s+/g, '.')}@wadaage.com`,
         phone: formPhone.trim() || '+252 63 0000000',
         role: formRole,
         rating: 5.0,
@@ -507,6 +540,8 @@ export const UserManagementTable: React.FC = React.memo(() => {
         password: formPassword.trim() || undefined,
       });
     }
+
+    setIsModalOpen(false);
 
     // Securely hash and update password across all stores smoothly
     if (formPassword.trim()) {
@@ -862,6 +897,11 @@ export const UserManagementTable: React.FC = React.memo(() => {
             <h3 className="text-lg font-bold">
               {editingUser ? 'Edit Profile' : 'Add New Profile'}
             </h3>
+            {formModalError && (
+              <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-xl text-xs font-semibold">
+                {formModalError}
+              </div>
+            )}
             <form onSubmit={handleSaveProfile} className="space-y-3 text-xs">
               <div>
                 <label className="block text-slate-400 mb-1">Full Name</label>

@@ -81,6 +81,25 @@ export const WadaageDriverWalletModal: React.FC<WadaageDriverWalletModalProps> =
     setActiveBalanceUsd(freshBal);
   }, [driverWallets, driverWalletBalanceUsd, driverWalletTransactions, activeDriverId, currentUser, drivers, getDriverWalletBalance]);
 
+  // Filter transactions to current driver if driver is logged in
+  const displayedTransactions = React.useMemo(() => {
+    if (currentUser?.role === 'driver') {
+      const myId = currentUser.id || '';
+      const myPhoneDigits = currentUser.phone ? String(currentUser.phone).replace(/\D/g, '') : '';
+      return driverWalletTransactions.filter((tx) => {
+        if (myId && (tx.driverId === myId || tx.driverId === `drv_${myId}`)) return true;
+        if (myPhoneDigits) {
+          const txPhoneDigits = tx.driverPhone ? String(tx.driverPhone).replace(/\D/g, '') : '';
+          if (txPhoneDigits && (txPhoneDigits === myPhoneDigits || txPhoneDigits.endsWith(myPhoneDigits) || myPhoneDigits.endsWith(txPhoneDigits))) {
+            return true;
+          }
+        }
+        return false;
+      });
+    }
+    return driverWalletTransactions;
+  }, [driverWalletTransactions, currentUser]);
+
   if (!isOpen) return null;
 
   const currentDriverRecord = drivers.find(
@@ -519,16 +538,16 @@ export const WadaageDriverWalletModal: React.FC<WadaageDriverWalletModalProps> =
             <div className="space-y-3">
               <h4 className="font-extrabold text-xs text-slate-300 uppercase tracking-wider flex items-center justify-between">
                 <span>Commission Wallet Statement</span>
-                <span className="text-[10px] text-slate-500 font-mono">{driverWalletTransactions.length} Transactions</span>
+                <span className="text-[10px] text-slate-500 font-mono">{displayedTransactions.length} Transactions</span>
               </h4>
 
               <div className="space-y-2 max-h-80 overflow-y-auto custom-scrollbar">
-                {driverWalletTransactions.length === 0 ? (
+                {displayedTransactions.length === 0 ? (
                   <div className="p-8 text-center text-slate-500 text-xs bg-slate-950 rounded-2xl border border-slate-800">
                     No wallet transactions recorded yet.
                   </div>
                 ) : (
-                  driverWalletTransactions.map((tx) => {
+                  displayedTransactions.map((tx) => {
                     const isPending = tx.status === 'pending_verification';
                     const isCompleted = tx.status === 'completed';
                     const isRejected = tx.status === 'rejected';

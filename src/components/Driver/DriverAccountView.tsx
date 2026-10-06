@@ -99,17 +99,17 @@ export const DriverAccountView: React.FC<DriverAccountViewProps> = ({
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
           <div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800">
             <span className="text-[10px] text-slate-400 uppercase font-bold block">Vehicle Model</span>
-            <span className="font-extrabold text-slate-900 dark:text-white text-sm">{driver.vehicle.model}</span>
+            <span className="font-extrabold text-slate-900 dark:text-white text-sm">{driver?.vehicle?.model || (driver as any)?.vehicle_model || 'Toyota Vitz'}</span>
           </div>
 
           <div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800">
             <span className="text-[10px] text-slate-400 uppercase font-bold block">License Plate</span>
-            <span className="font-extrabold text-emerald-500 font-mono text-sm">{driver.vehicle.licensePlate}</span>
+            <span className="font-extrabold text-emerald-500 font-mono text-sm">{driver?.vehicle?.licensePlate || (driver as any)?.vehicle_plate || 'SL-101'}</span>
           </div>
 
           <div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 col-span-2 sm:col-span-1">
             <span className="text-[10px] text-slate-400 uppercase font-bold block">Color & Type</span>
-            <span className="font-extrabold text-slate-900 dark:text-white text-sm">{driver.vehicle.color} Sedan</span>
+            <span className="font-extrabold text-slate-900 dark:text-white text-sm">{driver?.vehicle?.color || 'White'} Sedan</span>
           </div>
         </div>
       </div>
