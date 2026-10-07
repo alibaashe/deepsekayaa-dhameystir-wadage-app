@@ -159,13 +159,9 @@ export const MobileDriverApp: React.FC = () => {
 
   // Street Hail (Standing Pickup & Live Taximeter) State
   const [showStreetHailModal, setShowStreetHailModal] = useState(false);
-  const [standingMode, setStandingMode] = useState<'open_meter' | 'with_destination'>('open_meter');
+  const [isMiniMapHud, setIsMiniMapHud] = useState(false);
   const [streetPassengerName, setStreetPassengerName] = useState('');
   const [streetPassengerPhone, setStreetPassengerPhone] = useState('');
-  const [streetDestination, setStreetDestination] = useState('');
-  const [streetHailDistanceKm, setStreetHailDistanceKm] = useState<number>(3.0);
-  const [streetHailSearchResults, setStreetHailSearchResults] = useState<any[]>([]);
-  const [isSearchingStreetPlaces, setIsSearchingStreetPlaces] = useState(false);
   const [streetPaymentMethod, setStreetPaymentMethod] = useState<'cash' | 'wallet'>('cash');
   const [kycAlertMessage, setKycAlertMessage] = useState<string | null>(null);
 
@@ -201,72 +197,18 @@ export const MobileDriverApp: React.FC = () => {
     return Number(currentRide?.distanceKm || liveMeterKm || 0);
   }, [currentRide?.isLiveTaximeter, currentRide?.liveTraveledKm, currentRide?.distanceKm, liveMeterKm]);
 
-  // Compute normal taxi fare: 1st KM = $1.20 (12,000 SLSH), each subsequent KM = $0.70 (7,000 SLSH)
-  const computedStreetFareUsd = useMemo(() => {
-    const km = Math.max(1, streetHailDistanceKm || 1);
-    const chargeableKm = Math.max(0, km - 1);
-    const fare = 1.20 + (chargeableKm * 0.70);
-    return Math.round(fare * 100) / 100;
-  }, [streetHailDistanceKm]);
-
-  const computedStreetFareSlsh = useMemo(() => {
-    return Math.round(computedStreetFareUsd * EXCHANGE_RATE_USD_TO_SLSH);
-  }, [computedStreetFareUsd]);
-
-  // Handle destination input changes & search both DB and Google
-  const handleStreetDestinationChange = useCallback(async (query: string) => {
-    setStreetDestination(query);
-    if (!query.trim() || query.trim().length < 2) {
-      setStreetHailSearchResults([]);
-      return;
-    }
-
-    setIsSearchingStreetPlaces(true);
+  // Launch External Google Maps turn-by-turn navigation for the driver
+  const handleOpenExternalGoogleMaps = useCallback(() => {
+    if (!currentRide) return;
+    const targetLoc = currentRide.status === 'accepted' ? currentRide.pickup : currentRide.dropoff;
+    const lat = targetLoc?.lat || 9.5600;
+    const lng = targetLoc?.lng || 44.0650;
+    const label = encodeURIComponent(targetLoc?.name || targetLoc?.address || 'Destination');
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&destination_place_id=${label}`;
     try {
-      const q = query.toLowerCase().trim();
-      // Bounded single pass with early exit, using the pre-lowercased haystack
-      // index so no strings are allocated per keystroke.
-      const localMatches: HargeisaPlace[] = [];
-      for (let i = 0; i < HARGEISA_PLACES.length && localMatches.length < 5; i++) {
-        if (getHargeisaSearchHaystack(i).includes(q)) {
-          localMatches.push(HARGEISA_PLACES[i]);
-        }
-      }
-
-      // Also query server Google autocomplete endpoint
-      const res = await fetch(`/api/places/autocomplete?input=${encodeURIComponent(query)}`);
-      let remoteMatches: any[] = [];
-      if (res.ok) {
-        const data = await res.json();
-        remoteMatches = Array.isArray(data.predictions) ? data.predictions.slice(0, 5) : [];
-      }
-
-      const combined = [...localMatches];
-      const seen = new Set(localMatches.map(m => m.name.toLowerCase()));
-      for (const r of remoteMatches) {
-        if (!seen.has(r.name.toLowerCase())) {
-          seen.add(r.name.toLowerCase());
-          combined.push(r);
-        }
-      }
-
-      setStreetHailSearchResults(combined);
-    } catch {
-      // Fallback
-    } finally {
-      setIsSearchingStreetPlaces(false);
-    }
-  }, []);
-
-  const handleSelectStreetPlace = useCallback((place: any) => {
-    setStreetDestination(place.name);
-    setStreetHailSearchResults([]);
-    const driverLoc = getDriverCoordinates();
-    const targetLat = place.lat || 9.5600;
-    const targetLng = place.lng || 44.0650;
-    const dist = calculateDistanceKm(driverLoc.lat, driverLoc.lng, targetLat, targetLng);
-    setStreetHailDistanceKm(Math.max(1, Math.round(dist * 10) / 10));
-  }, [getDriverCoordinates]);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (_e) {}
+  }, [currentRide]);
 
   // Determine current driver's KYC status
   const currentDriverRecord = drivers.find(
@@ -666,19 +608,20 @@ export const MobileDriverApp: React.FC = () => {
             <button
               type="button"
               onClick={() => {
-                setIsFullMapMode((prev) => !prev);
+                setIsFullMapMode(true);
+                setIsMiniMapHud((prev) => !prev);
                 setShowDetailsDrawer(false);
               }}
-              className={`w-10 h-10 rounded-2xl backdrop-blur-md shadow-md border flex flex-col items-center justify-center active:scale-95 transition cursor-pointer ${
-                isFullMapMode
-                  ? 'bg-emerald-600 text-white border-emerald-500 shadow-emerald-500/30'
-                  : 'bg-white/95 text-slate-700 border-slate-200/80 hover:bg-white'
+              className={`w-11 h-11 rounded-2xl backdrop-blur-md shadow-lg border flex flex-col items-center justify-center active:scale-95 transition cursor-pointer ${
+                isMiniMapHud
+                  ? 'bg-emerald-600 text-white border-emerald-400 shadow-emerald-500/40 ring-2 ring-emerald-400/50'
+                  : 'bg-white/95 text-slate-800 border-slate-200/90 hover:bg-white'
               }`}
-              title={isFullMapMode ? 'Khariidad Buuxda (Full Map Active) - Taabo si aad u aragto faahfaahin' : 'Daar Khariidad Buuxda (Full Map View)'}
+              title={isMiniMapHud ? 'Full Map Active (Taabo si aad u aragto card-ka buuxa)' : 'Daar Khariidad Buuxda (Open Full Map View)'}
             >
               <Map className="w-4 h-4" />
-              <span className="text-[7px] font-black uppercase tracking-tighter mt-0.5">
-                {isFullMapMode ? 'Full' : 'Map'}
+              <span className="text-[7.5px] font-black uppercase tracking-tighter mt-0.5">
+                {isMiniMapHud ? 'Full' : 'Map'}
               </span>
             </button>
 
@@ -1215,10 +1158,150 @@ export const MobileDriverApp: React.FC = () => {
               </button>
             </div>
           ) : currentRide && currentRide.status !== 'searching' && currentRide.status !== 'idle' ? (
-            isFullMapMode && !showDetailsDrawer ? (
+            isMiniMapHud ? (
+              /* ULTRA-CLEAN FULL MAP FLOATING HUD (MAXIMUM MAP VIEW WHILE DRIVING) */
+              <div className="bg-slate-900/95 backdrop-blur-md rounded-3xl border-2 border-emerald-500/80 p-3.5 shadow-2xl space-y-2.5 text-white animate-slideUp pointer-events-auto">
+                {/* Header milestone and toggles */}
+                <div className="flex items-center justify-between gap-2 pb-1 border-b border-slate-800">
+                  <div className="flex items-center space-x-2 min-w-0">
+                    <span className="relative flex h-2.5 w-2.5 shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                    </span>
+                    <div className="min-w-0">
+                      <span className="text-xs font-black truncate block text-emerald-400">
+                        {currentRide.status === 'accepted'
+                          ? `📍 Pickup: ${currentRide.pickup?.name || 'Pickup Point'}`
+                          : currentRide.status === 'driver_arrived'
+                          ? '🏁 Arrived at Pickup • Waiting Rider'
+                          : `🚗 Dropoff: ${currentRide.dropoff?.name || 'Destination'}`}
+                      </span>
+                      <span className="text-[10px] text-slate-400 truncate block">
+                        Passenger: {currentRide.passengerName || 'Passenger'} • {currentRide.passengerPhone || ''}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleOpenExternalGoogleMaps}
+                      className="px-2.5 py-1.5 rounded-xl bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 border border-blue-500/40 text-[11px] font-black flex items-center space-x-1 shadow transition cursor-pointer active:scale-95"
+                      title="Open Google Maps GPS Navigation"
+                    >
+                      <Compass className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Google Maps</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsMiniMapHud(false)}
+                      className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] font-black flex items-center space-x-1 transition cursor-pointer active:scale-95"
+                      title="Expand Details Card"
+                    >
+                      <ChevronUp className="w-3.5 h-3.5" />
+                      <span>Faahfaahin</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Taximeter distance & fare bar */}
+                <div className="flex items-center justify-between bg-slate-950/90 px-3 py-2 rounded-2xl border border-slate-800 text-xs">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-slate-400 text-[11px] font-bold">Odometer:</span>
+                    <span className="font-mono font-black text-white text-sm">
+                      {displayedMeterKm.toFixed(2)} KM
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      ⏱️ {Math.floor(liveMeterSeconds / 60)}m {liveMeterSeconds % 60}s
+                    </span>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="font-mono font-black text-emerald-400 text-sm">
+                      {liveCalculatedFareSlsh.toLocaleString()} SLSH
+                    </span>
+                    <span className="text-[10px] text-slate-400 block font-bold">
+                      (${liveCalculatedFareUsd.toFixed(2)} USD)
+                    </span>
+                  </div>
+                </div>
+
+                {/* Primary Action Button */}
+                <button
+                  type="button"
+                  id="driver-btn-mini-primary-action"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    try {
+                      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                        navigator.vibrate([40, 30, 40]);
+                      }
+                    } catch (_e) {}
+                    sounds.playButtonClick();
+
+                    if (currentRide.status === 'in_progress') {
+                      const finalDist = Number(displayedMeterKm.toFixed(2));
+                      const meterExtraKm = Math.max(0, finalDist - 1.0);
+                      const meterFareSlshFinal = Math.round(12000 + meterExtraKm * 7000);
+                      const meterFareUsd = Math.round((meterFareSlshFinal / EXCHANGE_RATE_USD_TO_SLSH) * 100) / 100;
+                      
+                      const isShare = currentRide.category === 'wadaage_share' || currentRide.isShared;
+                      const ratePerKm = isShare ? 0.40 : 0.80;
+                      const dropoffFareUsd = currentRide.isLiveTaximeter
+                        ? meterFareUsd
+                        : Number((Number(currentRide.baseFare || 1.20) + (Number(currentRide.distanceKm || 1) * ratePerKm) - Number(currentRide.discountAmount || 0)).toFixed(2));
+                      const dropoffFareSlsh = currentRide.isLiveTaximeter
+                        ? meterFareSlshFinal
+                        : Math.round(dropoffFareUsd * EXCHANGE_RATE_USD_TO_SLSH);
+
+                      const waitingSecs = Number(currentRide.waitingSeconds || 0);
+                      const waitingMinutes = currentRide.waitingMinutes || (waitingSecs > 0 ? Math.ceil(waitingSecs / 60) : 0);
+                      const waitingFeeSlsh = currentRide.waitingFeeSlsh !== undefined ? currentRide.waitingFeeSlsh : waitingMinutes * 500;
+                      const waitingFeeUsd = currentRide.waitingFeeUsd !== undefined ? Number(currentRide.waitingFeeUsd) : Number((waitingFeeSlsh / EXCHANGE_RATE_USD_TO_SLSH).toFixed(2));
+
+                      const totalUsd = Math.round((dropoffFareUsd + waitingFeeUsd) * 100) / 100;
+                      const totalSlsh = Math.round(dropoffFareSlsh + waitingFeeSlsh);
+
+                      setCompletedTripSummary({
+                        distanceKm: finalDist,
+                        durationMins: Math.max(1, Math.ceil(liveMeterSeconds / 60)),
+                        dropoffFareUsd,
+                        dropoffFareSlsh,
+                        waitingMinutes,
+                        waitingFeeUsd,
+                        waitingFeeSlsh,
+                        totalFareUsd: totalUsd,
+                        totalFareSlsh: totalSlsh,
+                        paymentMethod: currentRide.paymentMethod || 'cash',
+                        passengerName: currentRide.passengerName || 'Passenger',
+                      });
+                      setShowTripSummaryModal(true);
+                    } else {
+                      advanceDriverRideState();
+                    }
+                  }}
+                  className={`w-full py-3.5 px-4 rounded-2xl text-white font-black text-xs uppercase tracking-wider shadow-lg transition-all duration-150 active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer border-2 ${
+                    currentRide.status === 'accepted'
+                      ? 'bg-[#008751] hover:bg-[#007445] border-emerald-400/60'
+                      : currentRide.status === 'driver_arrived'
+                      ? 'bg-[#0066f5] hover:bg-[#0052c2] border-blue-300/60'
+                      : 'bg-emerald-600 hover:bg-emerald-700 border-emerald-300/60'
+                  }`}
+                >
+                  <CheckCircle className="w-4 h-4 text-emerald-200" />
+                  <span>
+                    {currentRide.status === 'accepted'
+                      ? '📍 WAAN GAADHAY • I HAVE ARRIVED'
+                      : currentRide.status === 'driver_arrived'
+                      ? '🚗 BILOW SAFARKA • START TRIP'
+                      : `✅ DHAMMEE SAFARKA • COMPLETE TRIP (${liveCalculatedFareSlsh.toLocaleString()} SLSH)`}
+                  </span>
+                </button>
+              </div>
+            ) : isFullMapMode && !showDetailsDrawer ? (
               /* STREAMLINED LOW-PROFILE COMPACT ACTIVE TRIP HUD (Unobstructed Full-Bleed Map) */
               <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-3xl border border-slate-200/90 dark:border-slate-800 p-3.5 shadow-2xl space-y-2.5 animate-in fade-in slide-in-from-bottom-2">
-                {/* Milestone row & Expand Faahfaahin drawer toggle */}
+                {/* Milestone row & Full Map / Faahfaahin drawer toggle */}
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
                   <div className="flex items-center space-x-2 min-w-0">
                     <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
@@ -1234,16 +1317,29 @@ export const MobileDriverApp: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Expandable Faahfaahin (Details) button */}
-                  <button
-                    type="button"
-                    onClick={() => setShowDetailsDrawer(true)}
-                    className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 text-xs font-black flex items-center space-x-1 shrink-0 active:scale-95 transition shadow-xs cursor-pointer"
-                    title="Faahfaahin Safarka / View Full Trip Breakdown"
-                  >
-                    <span>Faahfaahin</span>
-                    <ChevronUp className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center space-x-1.5 shrink-0">
+                    {/* Dedicated Open Full Map Button */}
+                    <button
+                      type="button"
+                      onClick={() => setIsMiniMapHud(true)}
+                      className="px-2.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs flex items-center space-x-1 shadow-md active:scale-95 transition cursor-pointer"
+                      title="Open Full Map View (Khariidad Buuxda)"
+                    >
+                      <Map className="w-3.5 h-3.5" />
+                      <span>Full Map</span>
+                    </button>
+
+                    {/* Expandable Faahfaahin (Details) button */}
+                    <button
+                      type="button"
+                      onClick={() => setShowDetailsDrawer(true)}
+                      className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center space-x-1 shrink-0 active:scale-95 transition cursor-pointer"
+                      title="Faahfaahin Safarka / View Full Trip Breakdown"
+                    >
+                      <span>Faahfaahin</span>
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Carpool Rider Switcher (if dual carpool) */}
@@ -1318,8 +1414,8 @@ export const MobileDriverApp: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 1-Tap Quick Actions Bar: Chat, Call, Transfer, SOS */}
-                <div className="grid grid-cols-4 gap-2 pt-1">
+                {/* 1-Tap Quick Actions Bar: Chat, Call, GPS, Transfer, SOS */}
+                <div className="grid grid-cols-5 gap-1.5 pt-1">
                   <button
                     type="button"
                     onClick={() => setShowChatModal(true)}
@@ -1343,6 +1439,16 @@ export const MobileDriverApp: React.FC = () => {
                   >
                     <PhoneCall className="w-3.5 h-3.5 text-blue-600" />
                     <span>Wac</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenExternalGoogleMaps}
+                    className="py-2 px-1 rounded-xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-bold text-[11px] flex items-center justify-center space-x-1 transition active:scale-95 border border-blue-200 dark:border-blue-800 cursor-pointer"
+                    title="Open Google Maps GPS Navigation"
+                  >
+                    <Compass className="w-3.5 h-3.5 text-blue-600" />
+                    <span>GPS</span>
                   </button>
 
                   <button
