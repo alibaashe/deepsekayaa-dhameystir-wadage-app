@@ -1512,7 +1512,8 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ====================================================
   const METER_FIRST_KM_SLSH = 12000; // Flag drop / base fare covering the 1st kilometer
   const METER_EXTRA_KM_SLSH = 7000;  // Charged for every KM after the 1st one
-  const METER_MIN_GPS_STEP_KM = 0.015; // Ignore GPS jitter smaller than ~15 metres
+  const METER_MIN_GPS_STEP_KM = 0.008; // Ignore GPS jitter smaller than ~8 metres
+  const TAXIMETER_STATE_STORAGE_KEY = 'wadaage_taximeter_state';
 
   const [meterKm, setMeterKm] = useState<number>(0);
   const [meterSeconds, setMeterSeconds] = useState<number>(0);
@@ -1521,6 +1522,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const meterKmRef = useRef<number>(0);
   const meterRunningRef = useRef<boolean>(false); // true once the driver starts the live-taximeter trip
   const meterLastFixRef = useRef<{ lat: number; lng: number } | null>(null);
+  const meterLastFixTimestampRef = useRef<number>(Date.now());
   const meterRideIdRef = useRef<string | null>(null);
   const meterStartedAtRef = useRef<number>(0);
   const lastMeterSyncRef = useRef<number>(0);
@@ -1595,33 +1597,61 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const accumulateMeterFromGps = useCallback((lat: number, lng: number) => {
     if (!meterRunningRef.current) {
       meterLastFixRef.current = { lat, lng };
+      meterLastFixTimestampRef.current = Date.now();
       return;
     }
     const last = meterLastFixRef.current;
+    const now = Date.now();
+    const lastTime = meterLastFixTimestampRef.current || now;
+    const dtSeconds = Math.max(1, (now - lastTime) / 1000);
+
     meterLastFixRef.current = { lat, lng };
+    meterLastFixTimestampRef.current = now;
     if (!last) return;
 
     const segmentKm = calculateHaversineDistanceKm(last.lat, last.lng, lat, lng);
     // Skip GPS noise / standing still
     if (!Number.isFinite(segmentKm) || segmentKm < METER_MIN_GPS_STEP_KM) return;
-    // Reject absurd single jumps (GPS tower handover / bad accuracy fix)
-    if (segmentKm > 3) return;
-    // After the screen was locked the gap can be large; accept it up to a sane driving distance,
-    // otherwise treat it as a GPS glitch and re-anchor without charging
-    if (segmentKm > 1.5) {
-      console.warn('[Taximeter] Large GPS gap detected, re-anchoring odometer:', segmentKm.toFixed(2), 'KM');
-      return;
+
+    let kmToAdd = segmentKm;
+
+    if (dtSeconds <= 15) {
+      // Normal driving in foreground
+      const speedKmh = segmentKm / (dtSeconds / 3600);
+      // Reject absurd single jumps (GPS tower handover / bad accuracy fix > 160 km/h)
+      if (segmentKm > 2.0 && speedKmh > 160) return;
+    } else {
+      // App was closed, screen was off, or tab was backgrounded while driver drove
+      // Calculate plausible max distance covered during dtSeconds at max 120 km/h
+      const maxPlausibleKm = Math.max(3.0, (dtSeconds / 3600) * 120);
+      kmToAdd = Math.min(segmentKm, maxPlausibleKm);
     }
 
-    const nextKm = Math.round((meterKmRef.current + segmentKm) * 1000) / 1000;
+    const nextKm = Math.round((meterKmRef.current + kmToAdd) * 1000) / 1000;
     meterKmRef.current = nextKm;
     setMeterKm(nextKm);
+
+    // Save active taximeter state to localStorage so refresh or app close preserves odometer
+    try {
+      if (meterRideIdRef.current) {
+        localStorage.setItem(
+          TAXIMETER_STATE_STORAGE_KEY,
+          JSON.stringify({
+            rideId: meterRideIdRef.current,
+            km: nextKm,
+            lat,
+            lng,
+            timestamp: now,
+            startedAt: meterStartedAtRef.current,
+          })
+        );
+      }
+    } catch {}
 
     const seconds = meterElapsedSeconds();
     const updatedRide = buildMeterRide(nextKm, seconds);
     if (updatedRide && updatedRide.id === meterRideIdRef.current) {
       setCurrentRide((prev) => (prev && prev.id === updatedRide.id ? updatedRide : prev));
-      const now = Date.now();
       // Throttle network writes to ~1 per second; local state above stays perfectly smooth
       if (now - lastMeterSyncRef.current >= 1000) {
         lastMeterSyncRef.current = now;
@@ -1652,17 +1682,48 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // must continue from them instead of restarting the clock at zero.
       const isResume = Number(currentRide!.liveMeterStartedAt || 0) > 0;
       meterRideIdRef.current = currentRide!.id;
-      meterKmRef.current = Math.max(0, Number(currentRide!.liveTraveledKm || 0));
-      setMeterKm(meterKmRef.current);
+
+      // Check persistent taximeter state cache
+      let restoredKm = Math.max(0, Number(currentRide!.liveTraveledKm || 0));
+      let restoredLastLat: number | null = null;
+      let restoredLastLng: number | null = null;
+      let restoredLastTimestamp = Date.now();
+
+      try {
+        const cachedStr = localStorage.getItem(TAXIMETER_STATE_STORAGE_KEY);
+        if (cachedStr) {
+          const cached = JSON.parse(cachedStr);
+          if (cached && cached.rideId === currentRide!.id) {
+            restoredKm = Math.max(restoredKm, Number(cached.km || 0));
+            if (typeof cached.lat === 'number' && typeof cached.lng === 'number') {
+              restoredLastLat = cached.lat;
+              restoredLastLng = cached.lng;
+              restoredLastTimestamp = cached.timestamp || Date.now();
+            }
+          }
+        }
+      } catch {}
+
+      meterKmRef.current = restoredKm;
+      setMeterKm(restoredKm);
       meterStartedAtRef.current = isResume
         ? Number(currentRide!.liveMeterStartedAt)
         : Date.now();
       setMeterSeconds(meterElapsedSeconds());
       meterRunningRef.current = true;
       setIsMeterRunning(true);
-      const start = currentRide!.startCoordinates ||
-        (driverGpsStatus.active ? { lat: driverGpsStatus.lat, lng: driverGpsStatus.lng } : null);
-      if (start) meterLastFixRef.current = { lat: start.lat, lng: start.lng };
+
+      if (restoredLastLat !== null && restoredLastLng !== null) {
+        meterLastFixRef.current = { lat: restoredLastLat, lng: restoredLastLng };
+        meterLastFixTimestampRef.current = restoredLastTimestamp;
+      } else {
+        const start = currentRide!.startCoordinates ||
+          (driverGpsStatus.active ? { lat: driverGpsStatus.lat, lng: driverGpsStatus.lng } : null);
+        if (start) {
+          meterLastFixRef.current = { lat: start.lat, lng: start.lng };
+          meterLastFixTimestampRef.current = Date.now();
+        }
+      }
       lastMeterSyncRef.current = 0;
 
       const initialRide = buildMeterRide(meterKmRef.current, isResume ? meterElapsedSeconds() : 0);
@@ -5897,17 +5958,34 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Finish trip, trigger commission & earnings, deduct time/fares
       sounds.playCompletedSound();
-      handleTripCommissionAndEarnings(currentRide);
 
-      const updatedWaypoints = currentRide.optimalWaypointsSequence
-        ? currentRide.optimalWaypointsSequence.map((w) => ({ ...w, status: 'completed' as const }))
+      let finalizedRide = { ...currentRide };
+      if (currentRide.isLiveTaximeter) {
+        const finalKm = Math.max(Number(currentRide.liveTraveledKm || 0), Number(meterKmRef.current || 0));
+        const { fareUsd, fareSlsh } = computeMeterFare(finalKm);
+        const waitingFeeUsd = Number(currentRide.waitingFeeUsd || 0);
+        finalizedRide = {
+          ...currentRide,
+          distanceKm: finalKm,
+          liveTraveledKm: finalKm,
+          dropoffFareUsd: fareUsd,
+          dropoffFareSlsh: fareSlsh,
+          totalFare: Math.round((fareUsd + waitingFeeUsd) * 100) / 100,
+        };
+        try { localStorage.removeItem(TAXIMETER_STATE_STORAGE_KEY); } catch {}
+      }
+
+      handleTripCommissionAndEarnings(finalizedRide);
+
+      const updatedWaypoints = finalizedRide.optimalWaypointsSequence
+        ? finalizedRide.optimalWaypointsSequence.map((w) => ({ ...w, status: 'completed' as const }))
         : undefined;
 
       const completedRide: RideRequest = {
-        ...currentRide,
+        ...finalizedRide,
         status: 'completed',
         completedAt: new Date().toLocaleTimeString(),
-        optimalWaypointsSequence: updatedWaypoints || currentRide.optimalWaypointsSequence,
+        optimalWaypointsSequence: updatedWaypoints || finalizedRide.optimalWaypointsSequence,
       };
       markRideAsDismissed(completedRide.id);
       setCurrentRide(completedRide);

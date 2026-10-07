@@ -3073,7 +3073,7 @@ export const MobileDriverApp: React.FC = () => {
         );
       })()}
 
-      {/* Manual Street Hail (Standing Pickup On The Road) Modal */}
+      {/* Manual Street Hail (Standing Pickup On The Road - Live Taximeter) Modal */}
       {showStreetHailModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fadeIn">
           <div className="bg-slate-900 border border-emerald-500/40 rounded-3xl p-5 max-w-md w-full shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
@@ -3084,7 +3084,7 @@ export const MobileDriverApp: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-extrabold text-sm text-white">Standing Pickup on the Road</h3>
-                  <p className="text-[11px] text-slate-400">Normal Taxi On-Road Meter & Fare Calculation</p>
+                  <p className="text-[11px] text-emerald-400 font-bold">⚡ Digital Live Taximeter</p>
                 </div>
               </div>
               <button
@@ -3096,51 +3096,29 @@ export const MobileDriverApp: React.FC = () => {
               </button>
             </div>
 
-            {/* Mode Toggle: Open Live Taximeter vs Pre-set Destination */}
-            <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-950/80 rounded-2xl border border-slate-800">
-              <button
-                type="button"
-                onClick={() => setStandingMode('open_meter')}
-                className={`py-2 px-2.5 rounded-xl text-xs font-black transition flex items-center justify-center space-x-1.5 ${
-                  standingMode === 'open_meter'
-                    ? 'bg-[#008751] text-white shadow'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <Zap className="w-3.5 h-3.5" />
-                <span>Open Taximeter</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setStandingMode('with_destination')}
-                className={`py-2 px-2.5 rounded-xl text-xs font-black transition flex items-center justify-center space-x-1.5 ${
-                  standingMode === 'with_destination'
-                    ? 'bg-[#008751] text-white shadow'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <MapPin className="w-3.5 h-3.5" />
-                <span>Search Destination</span>
-              </button>
-            </div>
-
             {/* Standard Taxi Pricing Notice Banner */}
-            <div className="p-3 bg-emerald-950/60 border border-emerald-500/30 rounded-2xl text-[11.5px] space-y-1">
+            <div className="p-3 bg-emerald-950/60 border border-emerald-500/30 rounded-2xl text-[11.5px] space-y-1.5">
               <div className="flex items-center justify-between font-black text-emerald-300">
-                <span>📍 Standard Taxi Pricing Formula:</span>
-                <span className="text-[10px] bg-emerald-500/20 px-2 py-0.5 rounded-full border border-emerald-500/40">Hargeisa Metred</span>
+                <span className="flex items-center gap-1.5">
+                  <Zap className="w-4 h-4 text-emerald-400" />
+                  <span>Standard Metered Taxi Pricing:</span>
+                </span>
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/40 font-bold">Live GPS Meter</span>
               </div>
-              <p className="text-slate-300 text-[11px]">
-                • <strong>1st KM (Base Fare):</strong> 12,000 SLSH ($1.20 USD)
+              <p className="text-slate-200 text-[11px] leading-snug">
+                • <strong>1st KM (Flag Drop):</strong> 12,000 SLSH ($1.20 USD)
               </p>
-              <p className="text-slate-300 text-[11px]">
-                • <strong>Subsequent KMs:</strong> +7,000 SLSH ($0.70 USD) per each additional km
+              <p className="text-slate-200 text-[11px] leading-snug">
+                • <strong>Extra Distance:</strong> +7,000 SLSH ($0.70 USD) per additional KM
               </p>
+              <div className="pt-1 text-[10.5px] text-emerald-400 font-medium flex items-center gap-1">
+                <span>📍 Real-time odometer continuously tracks actual kilometers driven on the road.</span>
+              </div>
             </div>
 
             <div className="space-y-3 pt-1">
               <div>
-                <label className="block text-[11px] font-bold text-slate-300 mb-1">Passenger Name (Magaca Rakaabka)</label>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1">Passenger Name (Magaca Rakaabka) - Optional</label>
                 <input
                   type="text"
                   placeholder="e.g. Maxamed Cali (Optional)"
@@ -3151,7 +3129,7 @@ export const MobileDriverApp: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-300 mb-1">Phone Number (Tel Rakaabka)</label>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1">Phone Number (Tel Rakaabka) - Optional</label>
                 <input
                   type="text"
                   placeholder="e.g. +252 63 4XXXXXX (Optional)"
@@ -3160,105 +3138,6 @@ export const MobileDriverApp: React.FC = () => {
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs focus:outline-none focus:border-emerald-500"
                 />
               </div>
-
-              {/* Mode 1: Open Live Taximeter Info */}
-              {standingMode === 'open_meter' ? (
-                <div className="p-3.5 bg-slate-800/80 border border-emerald-500/40 rounded-2xl space-y-2">
-                  <div className="flex items-center space-x-2 text-emerald-400 font-bold text-xs">
-                    <Zap className="w-4 h-4" />
-                    <span>Live GPS Distance & Fare Counting</span>
-                  </div>
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    Start right now from your current location without setting destination upfront. The digital meter tracks kilometers as you drive and displays the live fare.
-                  </p>
-                  <div className="pt-1 flex items-center justify-between text-xs font-mono font-bold text-emerald-300">
-                    <span>Initial Flag Drop:</span>
-                    <span>12,000 SLSH ($1.20 USD)</span>
-                  </div>
-                </div>
-              ) : (
-                /* Mode 2: Search Destination with DB & Google live suggestions */
-                <>
-                  <div className="relative">
-                    <label className="block text-[11px] font-bold text-slate-300 mb-1">
-                      Destination (Goobta Uu Tagayo) - Google & DB Search
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Search place in Hargeisa (e.g. Mansoor, Airport, Waheen...)"
-                        value={streetDestination}
-                        onChange={(e) => handleStreetDestinationChange(e.target.value)}
-                        className="w-full px-3.5 py-2.5 pr-8 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs focus:outline-none focus:border-emerald-500"
-                      />
-                      {isSearchingStreetPlaces && (
-                        <div className="absolute right-2.5 top-2.5">
-                          <div className="w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Dropdown Suggestions */}
-                    {streetHailSearchResults.length > 0 && (
-                      <div className="absolute left-0 right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-20 max-h-48 overflow-y-auto divide-y divide-slate-700">
-                        {streetHailSearchResults.map((place, idx) => (
-                          <button
-                            key={place.id || idx}
-                            type="button"
-                            onClick={() => handleSelectStreetPlace(place)}
-                            className="w-full text-left p-2.5 hover:bg-slate-700/80 flex items-center justify-between text-xs text-white transition"
-                          >
-                            <div className="truncate pr-2">
-                              <div className="font-bold text-slate-100 truncate">{place.name}</div>
-                              <div className="text-[10px] text-slate-400 truncate">{place.address}</div>
-                            </div>
-                            <span className="text-[9px] font-bold bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded shrink-0">
-                              Select
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Distance Slider / Selector */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1 text-[11px] font-bold">
-                      <span className="text-slate-300">Trip Distance:</span>
-                      <span className="text-emerald-400 font-mono font-black">{streetHailDistanceKm.toFixed(1)} KM</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0.5"
-                      max="25"
-                      step="0.5"
-                      value={streetHailDistanceKm}
-                      onChange={(e) => setStreetHailDistanceKm(parseFloat(e.target.value) || 1)}
-                      className="w-full accent-[#008751] cursor-pointer"
-                    />
-                  </div>
-
-                  {/* Live Fare Display Card */}
-                  <div className="p-3.5 bg-slate-800/90 border border-slate-700 rounded-2xl space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-400">Total Calculated Fare:</span>
-                      <div className="text-right">
-                        <div className="text-base font-black text-emerald-400 font-mono">
-                          {computedStreetFareSlsh.toLocaleString()} SLSH
-                        </div>
-                        <div className="text-[11px] text-slate-400 font-bold">
-                          (${computedStreetFareUsd.toFixed(2)} USD)
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-2 border-t border-slate-700/60 text-[10.5px] text-slate-400 flex items-center justify-between">
-                      <span>1st KM: 12,000 SLSH ($1.20)</span>
-                      <span>Extra {Math.max(0, streetHailDistanceKm - 1).toFixed(1)} KM @ 7k/km</span>
-                    </div>
-                  </div>
-                </>
-              )}
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-300 mb-1">Payment Method</label>
@@ -3276,32 +3155,25 @@ export const MobileDriverApp: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => {
-                    const isMeter = standingMode === 'open_meter';
                     if (createStreetHailRide) {
                       createStreetHailRide({
-                        name: streetPassengerName || 'Standing Passenger',
+                        name: streetPassengerName || 'Standing Roadside Passenger',
                         phone: streetPassengerPhone || '+252630000000',
-                        destinationAddress: isMeter ? '' : (streetDestination || 'Standing Pickup Destination'),
-                        fareUsd: isMeter ? 1.20 : computedStreetFareUsd,
-                        distanceKm: isMeter ? 0.0 : streetHailDistanceKm,
-                        isLiveTaximeter: isMeter,
+                        destinationAddress: 'Open Taximeter Destination (On Road)',
+                        fareUsd: 1.20,
+                        distanceKm: 0.0,
+                        isLiveTaximeter: true,
                         paymentMethod: streetPaymentMethod,
                       });
                     }
                     setShowStreetHailModal(false);
                     setStreetPassengerName('');
                     setStreetPassengerPhone('');
-                    setStreetDestination('');
-                    setStreetHailSearchResults([]);
                   }}
                   className="w-full py-3.5 rounded-2xl bg-[#008751] hover:bg-[#007445] text-white font-extrabold text-xs uppercase tracking-wider transition shadow-lg shadow-emerald-900/40 flex items-center justify-center space-x-2 cursor-pointer active:scale-95"
                 >
-                  <CheckCircle className="w-4 h-4 text-emerald-200" />
-                  <span>
-                    {standingMode === 'open_meter'
-                      ? '🚀 Start Live Taximeter Trip (12,000 SLSH)'
-                      : `Start Standing Taxi Trip (${computedStreetFareSlsh.toLocaleString()} SLSH)`}
-                  </span>
+                  <Zap className="w-4 h-4 text-emerald-200" />
+                  <span>🚀 Start Live Taximeter Trip (12,000 SLSH)</span>
                 </button>
               </div>
             </div>
