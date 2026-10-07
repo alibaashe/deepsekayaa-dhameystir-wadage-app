@@ -218,10 +218,12 @@ export const RolePermissionManager: React.FC = () => {
   };
 
   const filteredStaff = staffList.filter((s) => {
-    const matchesSearch =
-      s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.role.toLowerCase().includes(searchTerm.toLowerCase());
+    if (!s) return false;
+    const q = (searchTerm || '').toLowerCase().trim();
+    const name = (s.name || '').toLowerCase();
+    const email = (s.email || '').toLowerCase();
+    const role = (s.role || '').toLowerCase();
+    const matchesSearch = !q || name.includes(q) || email.includes(q) || role.includes(q);
 
     const matchesRole = selectedRoleFilter === 'all' || s.role === selectedRoleFilter;
     return matchesSearch && matchesRole;

@@ -40,7 +40,11 @@ export const TransactionHistoryModal: React.FC<TransactionHistoryModalProps> = (
   ];
 
   const filtered = allTransactions.filter((tx) => {
-    const matchesSearch = tx.user.toLowerCase().includes(searchTerm.toLowerCase()) || tx.id.toLowerCase().includes(searchTerm.toLowerCase());
+    if (!tx) return false;
+    const q = (searchTerm || '').toLowerCase().trim();
+    const userStr = (tx.user || '').toLowerCase();
+    const idStr = (tx.id || '').toLowerCase();
+    const matchesSearch = !q || userStr.includes(q) || idStr.includes(q);
     const matchesFilter = filterType === 'all' || tx.type === filterType;
     return matchesSearch && matchesFilter;
   });

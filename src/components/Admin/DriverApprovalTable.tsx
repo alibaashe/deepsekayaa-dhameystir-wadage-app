@@ -117,14 +117,14 @@ export const DriverApprovalTable: React.FC = React.memo(() => {
         {driverApplications.length === 0 ? (
           <p className="text-xs text-slate-500 text-center py-6">No driver applications submitted yet.</p>
         ) : (
-          driverApplications.map((app) => {
+          driverApplications.map((app, idx) => {
             const isApproved = app.status === 'approved';
             const isHold = app.status === 'on_hold' || (app.status as string) === 'hold';
             const isRejected = app.status === 'rejected';
 
             return (
               <div
-                key={app.id}
+                key={`app_${app.id || app.phone || idx}_${idx}`}
                 className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3 text-xs"
               >
                 {/* Main Summary Bar */}
@@ -247,10 +247,10 @@ export const DriverApprovalTable: React.FC = React.memo(() => {
                         <span>Dammaanad-qaade (Guarantor)</span>
                       </span>
                       <div className="text-[11px] space-y-1 text-slate-700 dark:text-slate-300">
-                        <p><strong>Name:</strong> {app.guarantor?.fullName || 'N/A'}</p>
-                        <p><strong>Phone:</strong> <span className="font-mono font-bold text-amber-600">{app.guarantor?.phone || 'N/A'}</span></p>
-                        <p><strong>Relation:</strong> {app.guarantor?.relationship || 'Guarantor'}</p>
-                        <p><strong>Address:</strong> {app.guarantor?.address || 'Hargeisa'}</p>
+                        <p><strong>Name:</strong> {app.guarantor.fullName}</p>
+                        <p><strong>Phone:</strong> <span className="font-mono font-bold text-amber-600">{app.guarantor.phone}</span></p>
+                        <p><strong>Relation:</strong> {app.guarantor.relationship}</p>
+                        <p><strong>Address:</strong> {app.guarantor.address}</p>
                       </div>
                     </div>
 
@@ -261,8 +261,8 @@ export const DriverApprovalTable: React.FC = React.memo(() => {
                         <span>Somaliland ID & Password</span>
                       </span>
                       <div className="text-[11px] space-y-1">
-                        <p><strong>SL ID No:</strong> <span className="font-mono font-bold">{app.somalilandIdNumber || 'N/A'}</span></p>
-                        <p><strong>License No:</strong> <span className="font-mono font-bold">{app.somalilandLicenseNumber || 'N/A'}</span></p>
+                        <p><strong>SL ID No:</strong> <span className="font-mono font-bold">{app.somalilandIdNumber}</span></p>
+                        <p><strong>License No:</strong> <span className="font-mono font-bold">{app.somalilandLicenseNumber}</span></p>
                         <p>
                           <strong>Driver Password:</strong>{' '}
                           <span className="font-mono font-bold text-emerald-500">
@@ -338,9 +338,9 @@ export const DriverApprovalTable: React.FC = React.memo(() => {
                         <span>Vehicle Specs</span>
                       </span>
                       <div className="text-[11px] space-y-1">
-                        <p><strong>Category:</strong> <span className="uppercase font-bold text-amber-600">{app.vehicle?.category || 'wadaage_taxi'}</span></p>
-                        <p><strong>Model:</strong> {app.vehicle?.model || 'Toyota Vitz'} ({app.vehicle?.color || 'White'})</p>
-                        <p><strong>Plate:</strong> <span className="font-mono font-bold">{app.vehicle?.licensePlate || 'SL-101'}</span></p>
+                        <p><strong>Category:</strong> <span className="uppercase font-bold text-amber-600">{app.vehicle.category}</span></p>
+                        <p><strong>Model:</strong> {app.vehicle.model} ({app.vehicle.color})</p>
+                        <p><strong>Plate:</strong> <span className="font-mono font-bold">{app.vehicle.licensePlate}</span></p>
                       </div>
                     </div>
 

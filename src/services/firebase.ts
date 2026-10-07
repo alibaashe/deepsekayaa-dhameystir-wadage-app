@@ -1168,9 +1168,9 @@ export async function batchDeleteFirestoreDocs(docRefs: any[]): Promise<number> 
 }
 
 /**
- * Resets Firebase User & Driver Database:
- * Batched deletes all existing users, drivers, applications, and non-active rides,
- * while STRICTLY preserving the admin user: usr_admin_baashe (+252 63 6807814).
+ * Resets Firebase User & Driver Database for Fresh Production Start:
+ * Batched deletes all existing users, drivers, applications, rides, wallet transactions,
+ * and clears all local storage caches, while STRICTLY preserving the Super Admin: usr_admin_baashe (+252 63 6807814).
  * Eliminates 'resource-exhausted' errors via safe 400-doc chunked writeBatch.
  */
 export async function resetFirebaseUserDatabase(): Promise<{
@@ -1202,7 +1202,29 @@ export async function resetFirebaseUserDatabase(): Promise<{
     console.warn('[Firebase Reset] Driver applications batch error:', err);
   }
 
-  // 3. Purge all users EXCEPT usr_admin_baashe with batched deletion
+  // 3. Purge all rides and ride message subcollections
+  try {
+    const ridesSnap = await getDocs(collection(db, 'rides'));
+    const rideRefs = ridesSnap.docs.map((r) => r.ref);
+    await batchDeleteFirestoreDocs(rideRefs);
+  } catch (err) {
+    console.warn('[Firebase Reset] Rides batch error:', err);
+  }
+
+  // 4. Purge all wallet transactions
+  try {
+    const txSnap = await getDocs(collection(db, 'driver_wallet_transactions'));
+    const txRefs = txSnap.docs.map((t) => t.ref);
+    await batchDeleteFirestoreDocs(txRefs);
+  } catch (_e) {}
+
+  try {
+    const txSnap2 = await getDocs(collection(db, 'wallet_transactions'));
+    const txRefs2 = txSnap2.docs.map((t) => t.ref);
+    await batchDeleteFirestoreDocs(txRefs2);
+  } catch (_e) {}
+
+  // 5. Purge all users EXCEPT usr_admin_baashe with batched deletion
   try {
     const usersSnap = await getDocs(collection(db, 'users'));
     const usersToDeleteRefs: any[] = [];
@@ -1215,7 +1237,9 @@ export async function resetFirebaseUserDatabase(): Promise<{
         data.id === 'usr_admin_baashe' ||
         data.phone === '+252 63 6807814' ||
         data.phone === '+252636807814' ||
-        data.role === 'admin';
+        data.email === 'baashe2002@gmail.com' ||
+        data.role === 'admin' ||
+        data.role === 'Sub-Admin';
 
       if (!isAdmin) {
         usersToDeleteRefs.push(u.ref);
@@ -1242,10 +1266,46 @@ export async function resetFirebaseUserDatabase(): Promise<{
     console.warn('[Firebase Reset] Users batch error:', err);
   }
 
-  // 4. Also call server-side purge to sync in-memory & MySQL databases
+  // 6. Call server-side purge to wipe in-memory & MySQL databases
   try {
     await fetch(getApiUrl('/api/admin/nuclear-purge'), { method: 'POST' });
   } catch (_err) {}
+
+  // 7. Clear all local storage & secure storage caches for clean production slate
+  try {
+    const superAdminObj = {
+      id: 'usr_admin_baashe',
+      name: 'Baashe (Super Admin)',
+      email: 'baashe2002@gmail.com',
+      phone: '+252 63 6807814',
+      role: 'admin',
+      status: 'Active',
+      rating: 5.0,
+      trips: 0,
+    };
+
+    localStorage.setItem('wadaage_registered_drivers', JSON.stringify([]));
+    localStorage.setItem('wadaage_driver_applications', JSON.stringify([]));
+    localStorage.setItem('wadaage_driver_wallets_map', JSON.stringify({}));
+    localStorage.setItem('wadaage_v2_wallets', JSON.stringify({}));
+    localStorage.setItem('wadaage_user_wallets_map', JSON.stringify({ 'usr_admin_baashe': 0.00 }));
+    localStorage.setItem('wadaage_driver_wallet_balance', '0');
+    localStorage.setItem('wadaage_user_wallet_balance', '0');
+    localStorage.setItem('wadaage_driver_wallet_transactions', JSON.stringify([]));
+    localStorage.setItem('wadaage_user_wallet_transactions', JSON.stringify([]));
+    localStorage.setItem('wadaage_all_rides_history', JSON.stringify([]));
+    localStorage.removeItem('wadaage_current_ride');
+    localStorage.removeItem('wadaage_active_trip');
+    localStorage.removeItem('wadaage_deleted_user_ids');
+    localStorage.setItem('wadaage_registered_users', JSON.stringify([superAdminObj]));
+    localStorage.setItem('wadaage_user_management_records', JSON.stringify([superAdminObj]));
+
+    if (typeof BroadcastChannel !== 'undefined') {
+      const channel = new BroadcastChannel('wadaage_ride_realtime_events');
+      channel.postMessage({ type: 'NUCLEAR_PURGED', timestamp: Date.now() });
+      channel.close();
+    }
+  } catch (_e) {}
 
   return {
     success: true,

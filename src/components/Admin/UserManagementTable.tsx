@@ -67,7 +67,70 @@ const markUserPermanentlyDeleted = (id: string, phone?: string) => {
 const loadPersistedUsers = (drivers: any[], driverApplications: any[]): UserRecord[] => {
   try {
     const deletedIds = getDeletedUserIds();
-    const registeredUsersMap = new Map<string, UserRecord>();
+    const byId = new Map<string, UserRecord>();
+    const byPhone = new Map<string, string>(); // normalized phone -> canonical id
+
+    const getNormPhone = (phone?: string | null) => {
+      if (!phone || typeof phone !== 'string') return '';
+      const clean = phone.replace(/\D/g, '');
+      return clean.length >= 6 ? clean.slice(-7) : clean;
+    };
+
+    const addOrMergeRecord = (rec: any) => {
+      if (!rec) return;
+      const recId = rec.id ? String(rec.id).trim() : '';
+      const recPhone = rec.phone ? String(rec.phone).trim() : '';
+      
+      if ((recId && deletedIds.has(recId)) || (recPhone && deletedIds.has(recPhone))) return;
+
+      const normPhone = getNormPhone(recPhone);
+      let targetId = '';
+
+      if (recId && byId.has(recId)) {
+        targetId = recId;
+      } else if (normPhone && byPhone.has(normPhone)) {
+        targetId = byPhone.get(normPhone)!;
+      }
+
+      const recName = (typeof rec.name === 'string' && rec.name.trim()) ? rec.name.trim() : 'Wadaage User';
+      const roleStr = String(rec.role || '').toLowerCase();
+      const role: 'Sub-Admin' | 'Driver' | 'Passenger' =
+        roleStr === 'admin' || roleStr === 'sub-admin' ? 'Sub-Admin' : roleStr === 'driver' ? 'Driver' : 'Passenger';
+      const email = rec.email || `${(recPhone ? recPhone.replace(/\D/g, '') : 'user')}@wadaage.com`;
+
+      if (targetId && byId.has(targetId)) {
+        const existing = byId.get(targetId)!;
+        const mergedRole = role === 'Driver' || existing.role === 'Driver' ? 'Driver' : (role === 'Sub-Admin' || existing.role === 'Sub-Admin' ? 'Sub-Admin' : role || existing.role);
+        const updated: UserRecord = {
+          ...existing,
+          ...rec,
+          id: targetId,
+          name: existing.name !== 'Wadaage User' && existing.name ? existing.name : recName,
+          role: mergedRole,
+          phone: recPhone || existing.phone,
+          email: existing.email || email,
+          status: rec.status || existing.status || 'Active',
+          trips: (typeof rec.trips === 'number' && rec.trips > 0) ? rec.trips : existing.trips,
+          rating: (typeof rec.rating === 'number' && rec.rating > 0) ? rec.rating : existing.rating,
+        };
+        byId.set(targetId, updated);
+        if (normPhone) byPhone.set(normPhone, targetId);
+      } else {
+        const newId = recId || (normPhone ? `usr_${normPhone}` : `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`);
+        const newRecord: UserRecord = {
+          id: newId,
+          name: recName,
+          role: role,
+          email: email,
+          phone: recPhone || '+252 63 0000000',
+          rating: typeof rec.rating === 'number' ? rec.rating : 5.0,
+          trips: typeof rec.trips === 'number' ? rec.trips : 0,
+          status: rec.status || 'Active',
+        };
+        byId.set(newId, newRecord);
+        if (normPhone) byPhone.set(normPhone, newId);
+      }
+    };
 
     // 1. Ensure Super Admin is always anchored
     const superAdmin: UserRecord = {
@@ -81,7 +144,7 @@ const loadPersistedUsers = (drivers: any[], driverApplications: any[]): UserReco
       status: 'Active',
     };
     if (!deletedIds.has(superAdmin.id)) {
-      registeredUsersMap.set(superAdmin.id, superAdmin);
+      addOrMergeRecord(superAdmin);
     }
 
     // 2. Check customized user management records
@@ -90,9 +153,8 @@ const loadPersistedUsers = (drivers: any[], driverApplications: any[]): UserReco
       try {
         const parsed = safeJsonParse(customRecordsStr, null);
         if (Array.isArray(parsed)) {
-          parsed.forEach((u: UserRecord) => {
-            if ((u.id && deletedIds.has(u.id)) || (u.phone && deletedIds.has(u.phone))) return;
-            if (u.id || u.phone) registeredUsersMap.set(u.id || u.phone, u);
+          parsed.forEach((u: any) => {
+            if (u) addOrMergeRecord(u);
           });
         }
       } catch (e) {
@@ -102,22 +164,11 @@ const loadPersistedUsers = (drivers: any[], driverApplications: any[]): UserReco
 
     // 3. Read secure storage users
     const secUsers = secureStorage.getItem<AuthUser[]>(STORAGE_USERS_KEY, []) || [];
-    secUsers.forEach((u) => {
-      const key = u.id || u.phone;
-      if (deletedIds.has(u.id) || (u.phone && deletedIds.has(u.phone))) return;
-      if (!registeredUsersMap.has(key)) {
-        registeredUsersMap.set(key, {
-          id: u.id || `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-          name: u.name || 'Wadaage User',
-          role: u.role === 'admin' ? 'Sub-Admin' : u.role === 'driver' ? 'Driver' : 'Passenger',
-          email: u.email || `${(u.phone || 'user').replace(/\D/g, '')}@wadaage.com`,
-          phone: u.phone || '+252 63 0000000',
-          rating: 5.0,
-          trips: 0,
-          status: 'Active',
-        });
-      }
-    });
+    if (Array.isArray(secUsers)) {
+      secUsers.forEach((u) => {
+        if (u) addOrMergeRecord(u);
+      });
+    }
 
     // 4. Read plain users from local storage safely
     const plainUsersStr = localStorage.getItem(STORAGE_USERS_KEY);
@@ -126,92 +177,49 @@ const loadPersistedUsers = (drivers: any[], driverApplications: any[]): UserReco
         const parsed = safeJsonParse(plainUsersStr, null);
         if (Array.isArray(parsed)) {
           parsed.forEach((u: any) => {
-            const key = u.id || u.phone;
-            if (deletedIds.has(u.id) || (u.phone && deletedIds.has(u.phone))) return;
-            if (!registeredUsersMap.has(key)) {
-              registeredUsersMap.set(key, {
-                id: u.id || `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-                name: u.name || 'Wadaage User',
-                role: u.role === 'admin' ? 'Sub-Admin' : u.role === 'driver' ? 'Driver' : 'Passenger',
-                email: u.email || `${(u.phone || 'user').replace(/\D/g, '')}@wadaage.com`,
-                phone: u.phone || '+252 63 0000000',
-                rating: 5.0,
-                trips: 0,
-                status: 'Active',
-              });
-            }
+            if (u) addOrMergeRecord(u);
           });
         }
       } catch {}
     }
 
-    // De-duplication key helper (normalizes phone number to avoid duplicate rows for same user/driver)
-    const getDedupeKey = (item: { id?: string; phone?: string; name?: string }) => {
-      if (item.phone) {
-        const cleanPhone = item.phone.replace(/\D/g, '');
-        if (cleanPhone.length >= 6) return `phone_${cleanPhone.slice(-7)}`;
-      }
-      if (item.id) return `id_${item.id}`;
-      if (item.name) return `name_${item.name.toLowerCase().trim()}`;
-      return `key_${Math.random()}`;
-    };
-
-    const deduplicatedMap = new Map<string, UserRecord>();
-
-    registeredUsersMap.forEach((u) => {
-      const dKey = getDedupeKey(u);
-      if (!deduplicatedMap.has(dKey)) {
-        deduplicatedMap.set(dKey, u);
-      } else {
-        const existing = deduplicatedMap.get(dKey)!;
-        // Prioritize Driver/Admin role or merged details
-        if (u.role === 'Driver' || u.role === 'Sub-Admin') {
-          deduplicatedMap.set(dKey, { ...existing, ...u });
-        }
-      }
-    });
-
     // 5. Add drivers from state
-    drivers.forEach((d) => {
-      if (deletedIds.has(d.id) || (d.phone && deletedIds.has(d.phone))) return;
-      const dKey = getDedupeKey(d);
-      const driverRecord: UserRecord = {
+    (drivers || []).forEach((d) => {
+      if (!d) return;
+      const driverName = (typeof d.name === 'string' && d.name.trim()) ? d.name.trim() : 'Driver';
+      addOrMergeRecord({
         id: d.id,
-        name: d.name,
+        name: driverName,
         role: 'Driver',
-        email: `${d.name.toLowerCase().replace(/\s+/g, '.')}@wadaage.com`,
+        email: d.email || `${driverName.toLowerCase().replace(/\s+/g, '.')}@wadaage.com`,
         phone: d.phone,
         rating: d.rating || 5.0,
         trips: d.totalTrips || 0,
         status: d.status === 'blocked' ? 'Blocked' : 'Active',
-      };
-      if (!deduplicatedMap.has(dKey)) {
-        deduplicatedMap.set(dKey, driverRecord);
-      } else {
-        const existing = deduplicatedMap.get(dKey)!;
-        deduplicatedMap.set(dKey, { ...existing, ...driverRecord, role: 'Driver' });
-      }
+      });
     });
 
     // 6. Add driver applications from state
-    driverApplications.forEach((app) => {
-      if (deletedIds.has(app.id) || (app.phone && deletedIds.has(app.phone))) return;
-      const dKey = getDedupeKey({ id: app.id, phone: app.phone, name: app.fullName });
-      if (!deduplicatedMap.has(dKey)) {
-        deduplicatedMap.set(dKey, {
-          id: app.id,
-          name: app.fullName,
-          role: 'Driver',
-          email: `${app.fullName.toLowerCase().replace(/\s+/g, '.')}@wadaage.com`,
-          phone: app.phone,
-          rating: 5.0,
-          trips: 0,
-          status: app.status === 'approved' ? 'Active' : 'Suspended',
-        });
-      }
+    (driverApplications || []).forEach((app) => {
+      if (!app) return;
+      const appName = (typeof app.fullName === 'string' && app.fullName.trim()) 
+        ? app.fullName.trim() 
+        : (typeof app.name === 'string' && app.name.trim()) 
+        ? app.name.trim() 
+        : 'Driver Applicant';
+      addOrMergeRecord({
+        id: app.id,
+        name: appName,
+        role: 'Driver',
+        email: app.email || `${appName.toLowerCase().replace(/\s+/g, '.')}@wadaage.com`,
+        phone: app.phone,
+        rating: 5.0,
+        trips: 0,
+        status: app.status === 'approved' ? 'Active' : 'Suspended',
+      });
     });
 
-    return Array.from(deduplicatedMap.values());
+    return Array.from(byId.values());
   } catch (e) {
     console.error('Error loading persisted users:', e);
     return [];
@@ -251,34 +259,75 @@ export const UserManagementTable: React.FC = React.memo(() => {
     if (!serverUsers || !Array.isArray(serverUsers)) return;
     const deletedIds = getDeletedUserIds();
     setUsers((prev) => {
-      const userMap = new Map<string, UserRecord>();
+      const byId = new Map<string, UserRecord>();
+      const byPhone = new Map<string, string>();
 
-      // Put server users (excluding any permanently deleted IDs)
-      serverUsers.forEach((su: any) => {
-        const id = su.id || `usr_${su.phone}`;
-        if (deletedIds.has(id) || (su.phone && deletedIds.has(su.phone))) return;
+      const getNormPhone = (phone?: string | null) => {
+        if (!phone || typeof phone !== 'string') return '';
+        const clean = phone.replace(/\D/g, '');
+        return clean.length >= 6 ? clean.slice(-7) : clean;
+      };
 
-        userMap.set(id, {
-          id: id,
-          name: su.name || 'Wadaage User',
-          role: su.role === 'admin' || su.role === 'Sub-Admin' ? 'Sub-Admin' : su.role === 'driver' || su.role === 'Driver' ? 'Driver' : 'Passenger',
-          email: su.email || `${(su.phone ? String(su.phone).replace(/\D/g, '') : 'user')}@wadaage.com`,
-          phone: su.phone || '+252 63 0000000',
-          rating: su.rating ? Number(su.rating) : 5.0,
-          trips: su.total_trips !== undefined ? Number(su.total_trips) : (su.trips ? Number(su.trips) : 0),
-          status: su.status === 'blocked' || su.status === 'Blocked' ? 'Blocked' : su.status === 'suspended' || su.status === 'Suspended' ? 'Suspended' : 'Active',
-        });
-      });
+      const addOrMerge = (su: any) => {
+        if (!su) return;
+        const id = su.id ? String(su.id).trim() : '';
+        const phone = su.phone ? String(su.phone).trim() : '';
+        if ((id && deletedIds.has(id)) || (phone && deletedIds.has(phone))) return;
 
-      // Retain existing users if not on server yet (and not deleted)
-      prev.forEach((pu) => {
-        if (deletedIds.has(pu.id) || (pu.phone && deletedIds.has(pu.phone))) return;
-        if (!userMap.has(pu.id) && !userMap.has(pu.phone)) {
-          userMap.set(pu.id, pu);
+        const normPhone = getNormPhone(phone);
+        let targetId = '';
+
+        if (id && byId.has(id)) {
+          targetId = id;
+        } else if (normPhone && byPhone.has(normPhone)) {
+          targetId = byPhone.get(normPhone)!;
         }
-      });
 
-      return Array.from(userMap.values());
+        const role = su.role === 'admin' || su.role === 'Sub-Admin' ? 'Sub-Admin' : su.role === 'driver' || su.role === 'Driver' ? 'Driver' : 'Passenger';
+        const name = (typeof su.name === 'string' && su.name.trim()) ? su.name.trim() : 'Wadaage User';
+        const email = su.email || `${(phone ? phone.replace(/\D/g, '') : 'user')}@wadaage.com`;
+
+        if (targetId && byId.has(targetId)) {
+          const existing = byId.get(targetId)!;
+          const mergedRole = role === 'Driver' || existing.role === 'Driver' ? 'Driver' : (role === 'Sub-Admin' || existing.role === 'Sub-Admin' ? 'Sub-Admin' : role || existing.role);
+          const updated: UserRecord = {
+            ...existing,
+            ...su,
+            id: targetId,
+            name: existing.name !== 'Wadaage User' && existing.name ? existing.name : name,
+            role: mergedRole,
+            phone: phone || existing.phone,
+            email: existing.email || email,
+            status: su.status === 'blocked' || su.status === 'Blocked' ? 'Blocked' : su.status === 'suspended' || su.status === 'Suspended' ? 'Suspended' : existing.status || 'Active',
+            rating: su.rating ? Number(su.rating) : existing.rating,
+            trips: su.total_trips !== undefined ? Number(su.total_trips) : (su.trips !== undefined ? Number(su.trips) : existing.trips),
+          };
+          byId.set(targetId, updated);
+          if (normPhone) byPhone.set(normPhone, targetId);
+        } else {
+          const newId = id || (normPhone ? `usr_${normPhone}` : `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`);
+          const newRecord: UserRecord = {
+            id: newId,
+            name: name,
+            role: role,
+            email: email,
+            phone: phone || '+252 63 0000000',
+            rating: su.rating ? Number(su.rating) : 5.0,
+            trips: su.total_trips !== undefined ? Number(su.total_trips) : (su.trips ? Number(su.trips) : 0),
+            status: su.status === 'blocked' || su.status === 'Blocked' ? 'Blocked' : su.status === 'suspended' || su.status === 'Suspended' ? 'Suspended' : 'Active',
+          };
+          byId.set(newId, newRecord);
+          if (normPhone) byPhone.set(normPhone, newId);
+        }
+      };
+
+      // Put server users first
+      serverUsers.forEach(addOrMerge);
+
+      // Retain existing local users not present on server
+      prev.forEach(addOrMerge);
+
+      return Array.from(byId.values());
     });
     setLastSyncTime(new Date().toLocaleTimeString());
   }, []);
@@ -354,7 +403,6 @@ export const UserManagementTable: React.FC = React.memo(() => {
   const [formPhone, setFormPhone] = useState('');
   const [formRole, setFormRole] = useState<'Passenger' | 'Driver' | 'Sub-Admin'>('Passenger');
   const [formPassword, setFormPassword] = useState('');
-  const [formModalError, setFormModalError] = useState<string | null>(null);
 
   const handleGeneratePassword = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
@@ -366,13 +414,16 @@ export const UserManagementTable: React.FC = React.memo(() => {
     setFormPassword(generated);
   };
 
-  const filtered = users.filter(
-    (u) =>
-      u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.phone.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const q = (searchTerm || '').toLowerCase().trim();
+  const filtered = users.filter((u) => {
+    if (!u) return false;
+    if (!q) return true;
+    const name = (u.name || '').toLowerCase();
+    const role = (u.role || '').toLowerCase();
+    const email = (u.email || '').toLowerCase();
+    const phone = (u.phone || '').toLowerCase();
+    return name.includes(q) || role.includes(q) || email.includes(q) || phone.includes(q);
+  });
 
   const handleToggleBlock = (id: string) => {
     const target = users.find((u) => u.id === id);
@@ -409,7 +460,6 @@ export const UserManagementTable: React.FC = React.memo(() => {
     setFormPhone('');
     setFormRole('Passenger');
     setFormPassword('');
-    setFormModalError(null);
     setIsModalOpen(true);
   };
 
@@ -420,7 +470,6 @@ export const UserManagementTable: React.FC = React.memo(() => {
     setFormPhone(u.phone);
     setFormRole(u.role);
     setFormPassword('');
-    setFormModalError(null);
     setIsModalOpen(true);
   };
 
@@ -440,34 +489,20 @@ export const UserManagementTable: React.FC = React.memo(() => {
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormModalError(null);
-    const trimmedName = formName.trim();
-    if (!trimmedName) {
-      setFormModalError('Fadlan qor magaca buuxa (Please enter full name).');
-      return;
-    }
+    if (!formName.trim()) return;
 
-    // Unique Name check (case-insensitive)
-    const isDuplicateName = users.some(
-      (u) => (editingUser ? u.id !== editingUser.id : true) &&
-             u.name &&
-             u.name.trim().toLowerCase() === trimmedName.toLowerCase()
-    );
-    if (isDuplicateName) {
-      setFormModalError('Magacan hore ayaa loo isticmaalay. Magac kasta waa inuu noqdaa mid u gaar ah hal qof (Name must be unique. A user with this name already exists).');
-      return;
-    }
+    const cleanInputPhone = formPhone.trim().replace(/\D/g, '');
 
-    // Unique Phone check
-    const cleanFormPhone = formPhone.replace(/\D/g, '');
-    if (cleanFormPhone && cleanFormPhone.length >= 7) {
-      const isDuplicatePhone = users.some(
-        (u) => (editingUser ? u.id !== editingUser.id : true) &&
-               u.phone &&
-               u.phone.replace(/\D/g, '') === cleanFormPhone
-      );
-      if (isDuplicatePhone) {
-        setFormModalError('Lambarkan taleefanka hore ayaa loo diiwaangeliyay. Lambar kasta waa inuu u gaar yahay hal qof (Phone number must be unique. Another account has this number).');
+    // Check duplicate phone number if adding new user or changing phone
+    if (cleanInputPhone.length >= 7) {
+      const isDuplicate = users.some((u) => {
+        if (editingUser && u.id === editingUser.id) return false;
+        const uClean = (u.phone || '').replace(/\D/g, '');
+        return uClean && (uClean === cleanInputPhone || (uClean.length >= 7 && (uClean.endsWith(cleanInputPhone) || cleanInputPhone.endsWith(uClean))));
+      });
+
+      if (isDuplicate) {
+        alert('⚠️ Taleefankan hore ayuu u diiwaangashanaa (This phone number is already registered for another user). Please use a unique phone number.');
         return;
       }
     }
@@ -478,7 +513,7 @@ export const UserManagementTable: React.FC = React.memo(() => {
       targetUserId = editingUser.id;
       const updatedUser: UserRecord = {
         ...editingUser,
-        name: trimmedName,
+        name: formName.trim(),
         email: formEmail.trim(),
         phone: formPhone.trim(),
         role: formRole,
@@ -502,8 +537,8 @@ export const UserManagementTable: React.FC = React.memo(() => {
       targetUserId = `usr_${Date.now()}`;
       const newUser: UserRecord = {
         id: targetUserId,
-        name: trimmedName,
-        email: formEmail.trim() || `${trimmedName.toLowerCase().replace(/\s+/g, '.')}@wadaage.com`,
+        name: formName.trim(),
+        email: formEmail.trim() || `${formName.trim().toLowerCase().replace(/\s+/g, '.')}@wadaage.com`,
         phone: formPhone.trim() || '+252 63 0000000',
         role: formRole,
         rating: 5.0,
@@ -540,8 +575,6 @@ export const UserManagementTable: React.FC = React.memo(() => {
         password: formPassword.trim() || undefined,
       });
     }
-
-    setIsModalOpen(false);
 
     // Securely hash and update password across all stores smoothly
     if (formPassword.trim()) {
@@ -602,19 +635,30 @@ export const UserManagementTable: React.FC = React.memo(() => {
 
           <button
             onClick={async () => {
-              if (window.confirm('Execute Nuclear Purge? This will wipe all fake/demo/simulator drivers, riders, and applications from Firestore and Database while preserving real registered accounts.')) {
+              if (window.confirm('Execute Fresh Production Reset? This will wipe all demo drivers, riders, rides, transactions, and reset all wallet balances to $0.00 while strictly preserving Super Admin Baashe.')) {
                 setIsPurging(true);
                 await purgeAllFirestoreDemoCollections();
+                const superAdminOnly: UserRecord = {
+                  id: 'usr_admin_baashe',
+                  name: 'Baashe (Super Admin)',
+                  role: 'Sub-Admin',
+                  email: 'baashe2002@gmail.com',
+                  phone: '+252 63 6807814',
+                  rating: 5.0,
+                  trips: 0,
+                  status: 'Active',
+                };
+                setUsers([superAdminOnly]);
                 handleManualRefresh();
                 setTimeout(() => setIsPurging(false), 1000);
               }
             }}
             disabled={isPurging}
-            title="Nuclear Data Purge (Wipe Demo & Simulator Data)"
+            title="Fresh Production Reset (Wipe All Demo Users, Drivers, Rides & Reset Balances)"
             className="px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 rounded-xl text-xs font-bold transition flex items-center space-x-1"
           >
             <Trash2 className={`w-3.5 h-3.5 ${isPurging ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Nuclear Purge</span>
+            <span className="hidden sm:inline">Fresh Reset</span>
           </button>
 
           <button
@@ -640,8 +684,8 @@ export const UserManagementTable: React.FC = React.memo(() => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-            {filtered.map((u) => (
-              <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+            {filtered.map((u, idx) => (
+              <tr key={`usr_row_${u.id}_${u.phone || ''}_${idx}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                 <td className="py-3 px-3">
                   <div className="flex items-center space-x-2">
                     <div className="w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-[11px] text-slate-700 dark:text-slate-300">
@@ -897,11 +941,6 @@ export const UserManagementTable: React.FC = React.memo(() => {
             <h3 className="text-lg font-bold">
               {editingUser ? 'Edit Profile' : 'Add New Profile'}
             </h3>
-            {formModalError && (
-              <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-xl text-xs font-semibold">
-                {formModalError}
-              </div>
-            )}
             <form onSubmit={handleSaveProfile} className="space-y-3 text-xs">
               <div>
                 <label className="block text-slate-400 mb-1">Full Name</label>

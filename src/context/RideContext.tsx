@@ -599,7 +599,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error(e);
     }
     return {
-      'usr_admin_baashe': 500.00,
+      'usr_admin_baashe': 0.00,
     };
   });
 
@@ -1893,158 +1893,219 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return [];
   });
 
-  const getDriverWalletBalance = useCallback((identifier: string): number => {
-    if (!identifier) return 0;
+  // --- ROBUST SOMALILAND DRIVER PHONE & IDENTITY ALIAS GENERATORS ---
+  const generateAllPhoneVariants = (rawPhone?: string | null): string[] => {
+    if (!rawPhone || typeof rawPhone !== 'string') return [];
+    const digits = rawPhone.replace(/\D/g, '');
+    if (!digits) return [rawPhone.trim()];
 
-    const cleanInput = String(identifier).replace(/\D/g, '');
+    const variants = new Set<string>();
+    variants.add(rawPhone.trim());
+    variants.add(digits);
 
-    // 1. Gather all candidate alias keys related to this driver
-    const candidateKeys = new Set<string>();
-    candidateKeys.add(identifier);
-    if (cleanInput) {
-      candidateKeys.add(cleanInput);
-      candidateKeys.add(`+252${cleanInput}`);
-      candidateKeys.add(`+252 ${cleanInput}`);
+    let local7 = '';
+    let operatorCode = '';
+
+    if (digits.startsWith('252')) {
+      const without252 = digits.slice(3);
+      variants.add(without252);
+      variants.add(`0${without252}`);
+      if (without252.length >= 8) {
+        operatorCode = without252.slice(0, 2);
+        local7 = without252.slice(2);
+      } else if (without252.length >= 7) {
+        local7 = without252.slice(-7);
+      }
+    } else if (digits.startsWith('0')) {
+      const withoutZero = digits.slice(1);
+      variants.add(withoutZero);
+      variants.add(`252${withoutZero}`);
+      variants.add(`+252${withoutZero}`);
+      if (withoutZero.length >= 8) {
+        operatorCode = withoutZero.slice(0, 2);
+        local7 = withoutZero.slice(2);
+      } else if (withoutZero.length >= 7) {
+        local7 = withoutZero.slice(-7);
+      }
+    } else if (digits.length >= 8 && (digits.startsWith('63') || digits.startsWith('65') || digits.startsWith('61') || digits.startsWith('62'))) {
+      operatorCode = digits.slice(0, 2);
+      local7 = digits.slice(2);
+      variants.add(`0${digits}`);
+      variants.add(`252${digits}`);
+      variants.add(`+252${digits}`);
+    } else if (digits.length >= 7) {
+      local7 = digits.slice(-7);
     }
 
-    // Search in drivers array for matching driver
-    const matchedDrv = drivers.find((d) => {
+    if (local7) {
+      variants.add(local7);
+      if (operatorCode) {
+        variants.add(`${operatorCode}${local7}`);
+        variants.add(`0${operatorCode}${local7}`);
+        variants.add(`0${operatorCode} ${local7}`);
+        variants.add(`252${operatorCode}${local7}`);
+        variants.add(`+252${operatorCode}${local7}`);
+        variants.add(`+252 ${operatorCode} ${local7}`);
+        variants.add(`+252 ${operatorCode}${local7}`);
+      } else {
+        variants.add(`63${local7}`);
+        variants.add(`063${local7}`);
+        variants.add(`063 ${local7}`);
+        variants.add(`25263${local7}`);
+        variants.add(`+252 63 ${local7}`);
+        variants.add(`+25263${local7}`);
+      }
+    }
+
+    return Array.from(variants).filter(Boolean);
+  };
+
+  const getDriverAllAliases = useCallback((
+    identifier: string,
+    driversList: Driver[],
+    currentUserObj: AuthUser | null,
+    driverApps?: DriverApplication[]
+  ): Set<string> => {
+    const aliases = new Set<string>();
+    if (!identifier) return aliases;
+
+    const raw = String(identifier).trim();
+    aliases.add(raw);
+    const cleanInput = raw.replace(/\D/g, '');
+    if (cleanInput) aliases.add(cleanInput);
+
+    if (cleanInput.length >= 6) {
+      generateAllPhoneVariants(raw).forEach((v) => aliases.add(v));
+    }
+
+    // 1. Locate driver in drivers list
+    const matchedDrv = (driversList || []).find((d) => {
+      if (!d) return false;
+      if (d.id && (d.id === raw || d.id === identifier)) return true;
+      if (d.phone && (d.phone === raw || d.phone === identifier)) return true;
       const dClean = d.phone ? String(d.phone).replace(/\D/g, '') : '';
-      return (
-        d.id === identifier ||
-        d.phone === identifier ||
-        (cleanInput && (d.id === identifier || dClean === cleanInput || (dClean && cleanInput && (dClean.endsWith(cleanInput) || cleanInput.endsWith(dClean)))))
-      );
+      if (cleanInput && dClean) {
+        if (dClean === cleanInput || dClean.endsWith(cleanInput) || cleanInput.endsWith(dClean)) return true;
+      }
+      if (d.name && typeof d.name === 'string' && d.name.toLowerCase().trim() === raw.toLowerCase().trim()) return true;
+      return false;
     });
 
     if (matchedDrv) {
-      if (matchedDrv.id) candidateKeys.add(matchedDrv.id);
-      if (matchedDrv.phone) candidateKeys.add(matchedDrv.phone);
-      const dClean = matchedDrv.phone ? String(matchedDrv.phone).replace(/\D/g, '') : '';
-      if (dClean) candidateKeys.add(dClean);
-    }
-
-    // Search in currentUser if driver
-    if (currentUser && currentUser.role === 'driver') {
-      const cClean = currentUser.phone ? String(currentUser.phone).replace(/\D/g, '') : '';
-      const cMatches =
-        currentUser.id === identifier ||
-        currentUser.phone === identifier ||
-        (cleanInput && cClean && (cClean.endsWith(cleanInput) || cleanInput.endsWith(cClean)));
-
-      if (cMatches) {
-        if (currentUser.id) candidateKeys.add(currentUser.id);
-        if (currentUser.phone) candidateKeys.add(currentUser.phone);
-        if (cClean) candidateKeys.add(cClean);
+      if (matchedDrv.id) aliases.add(matchedDrv.id);
+      if (matchedDrv.phone) {
+        generateAllPhoneVariants(matchedDrv.phone).forEach((v) => aliases.add(v));
+      }
+      if (matchedDrv.name) {
+        aliases.add(matchedDrv.name.trim());
+        aliases.add(matchedDrv.name.toLowerCase().trim());
       }
     }
 
-    // Search all keys in driverWallets map for phone matches
-    if (cleanInput) {
-      for (const k of Object.keys(driverWallets)) {
-        const kClean = k.replace(/\D/g, '');
-        if (kClean && (kClean === cleanInput || kClean.endsWith(cleanInput) || cleanInput.endsWith(kClean))) {
-          candidateKeys.add(k);
+    // 2. Locate in currentUser
+    if (currentUserObj && currentUserObj.role === 'driver') {
+      const cClean = currentUserObj.phone ? String(currentUserObj.phone).replace(/\D/g, '') : '';
+      const isCurrent =
+        currentUserObj.id === raw ||
+        currentUserObj.phone === raw ||
+        (matchedDrv && currentUserObj.id === matchedDrv.id) ||
+        (cleanInput && cClean && (cClean === cleanInput || cClean.endsWith(cleanInput) || cleanInput.endsWith(cClean))) ||
+        (currentUserObj.name && currentUserObj.name.toLowerCase().trim() === raw.toLowerCase().trim());
+
+      if (isCurrent) {
+        if (currentUserObj.id) aliases.add(currentUserObj.id);
+        if (currentUserObj.phone) {
+          generateAllPhoneVariants(currentUserObj.phone).forEach((v) => aliases.add(v));
+        }
+        if (currentUserObj.name) {
+          aliases.add(currentUserObj.name.trim());
+          aliases.add(currentUserObj.name.toLowerCase().trim());
         }
       }
     }
 
-    // 2. Check explicit driverWallets map
-    let mapBal: number | null = null;
-    for (const key of candidateKeys) {
+    // 3. Locate in driverApplications
+    if (driverApps && driverApps.length > 0) {
+      const matchedApp = driverApps.find((app) => {
+        if (!app) return false;
+        if (app.id && app.id === raw) return true;
+        if (app.phone && app.phone === raw) return true;
+        const aClean = app.phone ? String(app.phone).replace(/\D/g, '') : '';
+        if (cleanInput && aClean && (aClean === cleanInput || aClean.endsWith(cleanInput) || cleanInput.endsWith(aClean))) return true;
+        if (app.fullName && app.fullName.toLowerCase().trim() === raw.toLowerCase().trim()) return true;
+        return false;
+      });
+      if (matchedApp) {
+        if (matchedApp.id) aliases.add(matchedApp.id);
+        if (matchedApp.phone) generateAllPhoneVariants(matchedApp.phone).forEach((v) => aliases.add(v));
+      }
+    }
+
+    return aliases;
+  }, []);
+
+  const getDriverWalletBalance = useCallback((identifier: string): number => {
+    if (!identifier) return 0;
+
+    const candidateAliases = getDriverAllAliases(identifier, drivers, currentUser, driverApplications);
+
+    // 1. Check all candidate keys in driverWallets map
+    const foundMapValues: number[] = [];
+    for (const key of candidateAliases) {
       if (driverWallets[key] !== undefined) {
         const val = Number(driverWallets[key]);
-        if (!isNaN(val) && val > 0) {
-          mapBal = val;
-          break;
+        if (!isNaN(val)) {
+          foundMapValues.push(val);
         }
       }
     }
 
-    // 3. Calculate authoritative net balance from completed driverWalletTransactions ledger
-    let ledgerSumUsd = 0;
-    let hasCompletedTx = false;
+    // 2. Check matched driver in drivers array
+    const matchedDrv = drivers.find((d) => d && (candidateAliases.has(d.id) || (d.phone && candidateAliases.has(d.phone))));
+    const drvBalUsd = matchedDrv?.walletBalanceUsd !== undefined
+      ? Number(matchedDrv.walletBalanceUsd)
+      : (matchedDrv as any)?.wallet_balance_usd !== undefined
+      ? Number((matchedDrv as any).wallet_balance_usd)
+      : undefined;
 
-    if (driverWalletTransactions && driverWalletTransactions.length > 0) {
-      driverWalletTransactions.forEach((tx) => {
-        const status = String(tx.status || '').toLowerCase();
-        if (status !== 'completed' && status !== 'verified') return;
+    // 3. Check currentUser if matching
+    const isCurrent = currentUser && currentUser.role === 'driver' && (
+      candidateAliases.has(currentUser.id) ||
+      (currentUser.phone && candidateAliases.has(currentUser.phone)) ||
+      (currentUser.name && candidateAliases.has(currentUser.name.toLowerCase().trim()))
+    );
+    const userBalUsd = isCurrent && currentUser?.walletBalanceUsd !== undefined
+      ? Number(currentUser.walletBalanceUsd)
+      : undefined;
 
-        const isMatch =
-          (tx.driverId && candidateKeys.has(tx.driverId)) ||
-          (tx.driverPhone && candidateKeys.has(tx.driverPhone)) ||
-          (tx.driverPhone && cleanInput && tx.driverPhone.replace(/\D/g, '').endsWith(cleanInput)) ||
-          (tx.driverId && cleanInput && tx.driverId.replace(/\D/g, '').endsWith(cleanInput));
-
-        if (isMatch) {
-          hasCompletedTx = true;
-          const amt = Number(tx.amountUsd ?? (tx.amountSos ? tx.amountSos / 10000 : 0));
-          const tType = String(tx.type || '').toLowerCase();
-          if (tType === 'commission_deduction' || tType === 'commission') {
-            ledgerSumUsd -= amt;
-          } else {
-            ledgerSumUsd += amt;
-          }
-        }
-      });
-    }
-
-    // 4. Check driver object in drivers array
-    let drvObjBal: number | null = null;
-    if (matchedDrv) {
-      const val = matchedDrv.walletBalanceUsd !== undefined
-        ? Number(matchedDrv.walletBalanceUsd)
-        : (matchedDrv as any).wallet_balance_usd !== undefined
-        ? Number((matchedDrv as any).wallet_balance_usd)
-        : undefined;
-      if (val !== undefined && !isNaN(val) && val > 0) {
-        drvObjBal = val;
+    if (foundMapValues.length > 0) {
+      // Prioritize the direct identifier key or matched driver ID or first available alias value
+      let selectedVal = foundMapValues[0];
+      if (driverWallets[identifier] !== undefined) {
+        selectedVal = Number(driverWallets[identifier]);
+      } else if (matchedDrv?.id && driverWallets[matchedDrv.id] !== undefined) {
+        selectedVal = Number(driverWallets[matchedDrv.id]);
+      } else if (matchedDrv?.phone && driverWallets[matchedDrv.phone] !== undefined) {
+        selectedVal = Number(driverWallets[matchedDrv.phone]);
       }
+      return Math.max(0, Math.round(selectedVal * 100) / 100);
     }
 
-    // 5. Check currentUser if driver
-    let userBal: number | null = null;
-    if (currentUser && currentUser.role === 'driver') {
-      const val = currentUser.walletBalanceUsd !== undefined
-        ? Number(currentUser.walletBalanceUsd)
-        : (currentUser as any).wallet_balance_usd !== undefined
-        ? Number((currentUser as any).wallet_balance_usd)
-        : undefined;
-      if (val !== undefined && !isNaN(val) && val > 0) {
-        userBal = val;
-      }
+    if (drvBalUsd !== undefined && !isNaN(drvBalUsd)) {
+      return Math.max(0, Math.round(drvBalUsd * 100) / 100);
     }
 
-    // Authoritative resolution: prioritize positive verified balance across active sources
-    const candidates = [
-      mapBal,
-      hasCompletedTx ? Math.max(0, ledgerSumUsd) : null,
-      drvObjBal,
-      userBal,
-    ].filter((v): v is number => v !== null && !isNaN(v));
-
-    if (candidates.length > 0) {
-      const resolved = Math.max(...candidates);
-      return Math.round(resolved * 100) / 100;
-    }
-
-    // Direct check if mapBal is explicitly 0
-    for (const key of candidateKeys) {
-      if (driverWallets[key] !== undefined) {
-        return Math.max(0, Number(driverWallets[key]) || 0);
-      }
+    if (userBalUsd !== undefined && !isNaN(userBalUsd)) {
+      return Math.max(0, Math.round(userBalUsd * 100) / 100);
     }
 
     return 0.00;
-  }, [driverWallets, drivers, currentUser, driverWalletTransactions]);
+  }, [driverWallets, drivers, currentUser, driverApplications, getDriverAllAliases]);
 
-  // Current active driver balance
+  // Current active driver balance: Always reads from canonical unified getDriverWalletBalance
   const activeDriverId = currentUser?.role === 'driver' ? (currentUser.id || currentUser.phone || '') : '';
-  const driverWalletBalanceUsd = currentUser?.role === 'driver'
-    ? ((activeDriverId ? getDriverWalletBalance(activeDriverId) : 0) ||
-       (currentUser.phone ? getDriverWalletBalance(currentUser.phone) : 0) ||
-       (currentUser.walletBalanceUsd !== undefined ? Number(currentUser.walletBalanceUsd) : 0) ||
-       0)
+  const driverWalletBalanceUsd = (currentUser?.role === 'driver' && activeDriverId)
+    ? getDriverWalletBalance(activeDriverId)
     : 0;
 
   const [lowBalanceLockoutAlert, setLowBalanceLockoutAlert] = useState<boolean>(false);
@@ -2925,40 +2986,31 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const targetId = driverId || driverPhone || tx?.driverId || tx?.driverPhone;
         const txStatus = String(tx?.status || '').toLowerCase();
         const isTxCompleted = !tx || txStatus === 'completed' || txStatus === 'verified';
+        if (targetId && isTxCompleted) {
+          if (newBalanceUsd !== undefined) {
+            applyDriverBalanceUpdate(driverId || tx?.driverId || targetId, driverPhone || tx?.driverPhone, Number(newBalanceUsd), true);
+          } else if (amountUsd) {
+            applyDriverBalanceUpdate(driverId || tx?.driverId || targetId, driverPhone || tx?.driverPhone, Number(amountUsd), false);
+          }
+        }
 
         if (tx) {
           setDriverWalletTransactions((prev) => {
             const idx = prev.findIndex((t) => t.id === tx.id);
-            let updated: DriverWalletTransaction[];
             if (idx >= 0) {
-              updated = [...prev];
-              updated[idx] = { ...updated[idx], ...tx, status: 'completed' };
-            } else {
-              updated = [{ ...tx, status: 'completed' }, ...prev];
+              const updated = [...prev];
+              updated[idx] = tx;
+              return updated;
             }
-            try {
-              localStorage.setItem('wadaage_driver_wallet_transactions', JSON.stringify(updated));
-            } catch (_e) {}
-            return updated;
+            return [tx, ...prev];
           });
-        }
-
-        if (targetId && isTxCompleted) {
-          const amt = Number(amountUsd || tx?.amountUsd || (tx?.amountSos ? tx.amountSos / 10000 : 0));
-          if (newBalanceUsd !== undefined && Number(newBalanceUsd) > 0) {
-            applyDriverBalanceUpdate(driverId || tx?.driverId || targetId, driverPhone || tx?.driverPhone, Number(newBalanceUsd), true);
-          } else if (amt > 0) {
-            applyDriverBalanceUpdate(driverId || tx?.driverId || targetId, driverPhone || tx?.driverPhone, amt, false);
-          }
         }
       } else if (type === 'DRIVER_TOPUP_REQUESTED') {
         const { tx } = payload || {};
         if (tx) {
           setDriverWalletTransactions((prev) => {
             if (prev.some((t) => t.id === tx.id)) return prev;
-            const updated = [tx, ...prev];
-            try { localStorage.setItem('wadaage_driver_wallet_transactions', JSON.stringify(updated)); } catch (_e) {}
-            return updated;
+            return [tx, ...prev];
           });
         }
       }
@@ -2999,25 +3051,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
             }
           });
-          const merged = Array.from(map.values());
-          try {
-            localStorage.setItem('wadaage_driver_wallet_transactions', JSON.stringify(merged));
-          } catch (_e) {}
-          return merged;
-        });
-
-        // For any completed transaction in remoteTxs, ensure driver wallet map has credit
-        remoteTxs.forEach((tx) => {
-          const s = String(tx.status || '').toLowerCase();
-          if (s === 'completed' || s === 'verified') {
-            const targetId = tx.driverId || tx.driverPhone;
-            if (targetId) {
-              const amt = Number(tx.amountUsd ?? (tx.amountSos ? tx.amountSos / 10000 : 0));
-              if (amt > 0) {
-                applyDriverBalanceUpdate(targetId, tx.driverPhone, amt, false);
-              }
-            }
-          }
+          return Array.from(map.values());
         });
       }
     });
@@ -3253,84 +3287,39 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
     incomingUsdAmount: number,
     isAbsoluteBalance: boolean = false
   ): number => {
-    const targetPhone = targetDriverPhone || '';
-    const cleanPhone = targetPhone ? targetPhone.replace(/\D/g, '') : (targetDriverId ? targetDriverId.replace(/\D/g, '') : '');
+    const initialIdentifier = targetDriverId || targetDriverPhone || '';
+    const allAliases = getDriverAllAliases(initialIdentifier, drivers, currentUser, driverApplications);
+    if (targetDriverPhone) {
+      getDriverAllAliases(targetDriverPhone, drivers, currentUser, driverApplications).forEach((a) => allAliases.add(a));
+    }
 
     // Locate target driver in drivers list
     const foundDriver = drivers.find(
-      (d) =>
-        d.id === targetDriverId ||
-        (targetPhone && d.phone === targetPhone) ||
-        (cleanPhone && d.phone && String(d.phone).replace(/\D/g, '').endsWith(cleanPhone))
+      (d) => d && (allAliases.has(d.id) || (d.phone && allAliases.has(d.phone)))
     );
 
     const actualId = foundDriver?.id || targetDriverId;
-    const actualPhone = foundDriver?.phone || targetPhone;
+    const actualPhone = foundDriver?.phone || targetDriverPhone || '';
 
     // Get current balance with fallback to driver record
-    const retrievedBal = getDriverWalletBalance(actualId);
-    const retrievedPhoneBal = actualPhone ? getDriverWalletBalance(actualPhone) : undefined;
-    const effectiveRetrievedBal = retrievedBal !== undefined ? retrievedBal : retrievedPhoneBal;
-
-    const fallbackBal = foundDriver
-      ? Number(foundDriver.walletBalanceUsd ?? (foundDriver as any).wallet_balance_usd ?? 0.00)
-      : (currentUser?.role === 'driver' ? Number(currentUser.walletBalanceUsd ?? 0.00) : 0.00);
-
-    const currentBalUsd = (effectiveRetrievedBal !== undefined && !isNaN(effectiveRetrievedBal))
-      ? effectiveRetrievedBal
-      : (!isNaN(fallbackBal) ? fallbackBal : 0.00);
+    const currentBalUsd = getDriverWalletBalance(actualId) || (actualPhone ? getDriverWalletBalance(actualPhone) : 0);
 
     const newBalUsd = isAbsoluteBalance
       ? Math.max(0, Math.round(incomingUsdAmount * 100) / 100)
       : Math.max(0, Math.round((currentBalUsd + incomingUsdAmount) * 100) / 100);
 
-    // 1. Mutate driverWallets map across ALL key aliases simultaneously
+    // Also include any other key in driverWallets that matches clean phone digits
+    const cleanPhone = (actualPhone || targetDriverId || '').replace(/\D/g, '');
+    for (const k of Object.keys(driverWallets)) {
+      const kClean = k.replace(/\D/g, '');
+      if (cleanPhone && kClean && (kClean === cleanPhone || kClean.endsWith(cleanPhone) || cleanPhone.endsWith(kClean))) {
+        allAliases.add(k);
+      }
+    }
+
+    // 1. Mutate driverWallets map across ALL key aliases simultaneously to the exact same new balance
     setDriverWallets((prev) => {
       const updated = { ...prev };
-      const allAliases = new Set<string>();
-      if (actualId) allAliases.add(actualId);
-      if (targetDriverId) allAliases.add(targetDriverId);
-      if (actualPhone) allAliases.add(actualPhone);
-      if (targetPhone) allAliases.add(targetPhone);
-      if (cleanPhone) {
-        allAliases.add(cleanPhone);
-        allAliases.add(`+252 ${cleanPhone}`);
-        allAliases.add(`+252${cleanPhone}`);
-      }
-      if (foundDriver) {
-        if (foundDriver.id) allAliases.add(foundDriver.id);
-        if (foundDriver.phone) {
-          allAliases.add(foundDriver.phone);
-          const fClean = String(foundDriver.phone).replace(/\D/g, '');
-          if (fClean) allAliases.add(fClean);
-        }
-      }
-      if (currentUser && currentUser.role === 'driver') {
-        const cClean = currentUser.phone ? currentUser.phone.replace(/\D/g, '') : '';
-        const isCurrentDriver =
-          currentUser.id === actualId ||
-          currentUser.id === targetDriverId ||
-          (actualPhone && currentUser.phone === actualPhone) ||
-          (targetPhone && currentUser.phone === targetPhone) ||
-          (cleanPhone && cClean && (cClean === cleanPhone || cClean.endsWith(cleanPhone) || cleanPhone.endsWith(cClean)));
-        if (isCurrentDriver) {
-          if (currentUser.id) allAliases.add(currentUser.id);
-          if (currentUser.phone) allAliases.add(currentUser.phone);
-        }
-      }
-
-      // Synchronize any pre-existing keys in the map that match cleanPhone or ID
-      for (const k of Object.keys(prev)) {
-        const kClean = k.replace(/\D/g, '');
-        if (
-          (cleanPhone && kClean && (kClean === cleanPhone || kClean.endsWith(cleanPhone) || cleanPhone.endsWith(kClean))) ||
-          k === actualId ||
-          k === targetDriverId
-        ) {
-          allAliases.add(k);
-        }
-      }
-
       for (const a of allAliases) {
         updated[a] = newBalUsd;
       }
@@ -3351,13 +3340,8 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setDrivers((prev) => {
       const updatedDrivers = prev.map((d) => {
-        const dClean = d.phone ? d.phone.replace(/\D/g, '') : '';
-        const matches =
-          d.id === actualId ||
-          d.id === targetDriverId ||
-          (actualPhone && d.phone === actualPhone) ||
-          (targetPhone && d.phone === targetPhone) ||
-          (cleanPhone && dClean && (dClean === cleanPhone || dClean.endsWith(cleanPhone) || cleanPhone.endsWith(dClean)));
+        if (!d) return d;
+        const matches = allAliases.has(d.id) || (d.phone && allAliases.has(d.phone));
 
         if (matches) {
           const isEligible = newBalUsd >= minThresholdUsd && newBalUsd > 0;
@@ -3412,13 +3396,10 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // 3. Mutate currentUser if matching and persist to secureStorage & localStorage
     if (currentUser && currentUser.role === 'driver') {
-      const cClean = currentUser.phone ? currentUser.phone.replace(/\D/g, '') : '';
       const isCurrentDriver =
-        currentUser.id === actualId ||
-        currentUser.id === targetDriverId ||
-        (actualPhone && currentUser.phone === actualPhone) ||
-        (targetPhone && currentUser.phone === targetPhone) ||
-        (cleanPhone && cClean && (cClean === cleanPhone || cClean.endsWith(cleanPhone) || cleanPhone.endsWith(cClean)));
+        allAliases.has(currentUser.id) ||
+        (currentUser.phone && allAliases.has(currentUser.phone)) ||
+        (currentUser.name && allAliases.has(currentUser.name.toLowerCase().trim()));
 
       if (isCurrentDriver) {
         const updatedUser: AuthUser = {
@@ -3453,15 +3434,10 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Admin verifies and controls real amount received for driver top-up (strictly isolates to the targeted driver only)
   const verifyAndApproveDriverTopUp = (txId: string, realAmountSosInput?: number, adminNote?: string) => {
-    let approvedTxObj: DriverWalletTransaction | null = null;
-    let targetDriverId = '';
-    let targetDriverPhone = '';
-    let creditedUsd = 0;
-    let creditedSos = 0;
-
-    setDriverWalletTransactions((prev) => {
-      const updatedList = prev.map((tx) => {
+    setDriverWalletTransactions((prev) =>
+      prev.map((tx) => {
         if (tx.id === txId) {
+          // Atomic Lock Guard: Prevent double-execution if transaction is already completed or verified
           const curStatus = String(tx.status || '').toLowerCase();
           if (curStatus === 'completed' || curStatus === 'verified') {
             return tx;
@@ -3469,10 +3445,10 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           const finalSos = realAmountSosInput && realAmountSosInput > 0 ? realAmountSosInput : tx.amountSos;
           const finalUsd = Math.round((finalSos / 10000) * 100) / 100;
-          targetDriverId = tx.driverId || 'drv_01';
-          targetDriverPhone = tx.driverPhone || '';
-          creditedUsd = finalUsd;
-          creditedSos = finalSos;
+          const targetDriverId = tx.driverId || 'drv_01';
+
+          // Apply balance update across all key aliases
+          const calculatedNewBalUsd = applyDriverBalanceUpdate(targetDriverId, tx.driverPhone, finalUsd, false);
 
           const approvedTx: DriverWalletTransaction = {
             ...tx,
@@ -3483,44 +3459,29 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
             verificationMethod: 'admin_confirmation',
             adminNote: adminNote || `Verified by Admin. Real amount credited: ${finalSos.toLocaleString()} SLSH ($${finalUsd.toFixed(2)} USD) to driver ${tx.driverName || targetDriverId}.`,
           };
-          approvedTxObj = approvedTx;
+          saveTransactionToFirestore(approvedTx);
+          fetch(getApiUrl('/api/db/wallet-transactions'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...approvedTx,
+              alreadyCreditedOnFrontend: true,
+              newBalanceUsd: calculatedNewBalUsd,
+            }),
+          }).catch(() => {});
+          broadcastRideEvent('DRIVER_WALLET_UPDATED', {
+            driverId: targetDriverId,
+            driverPhone: tx.driverPhone,
+            amountUsd: finalUsd,
+            amountSos: finalSos,
+            newBalanceUsd: calculatedNewBalUsd,
+            tx: approvedTx,
+          });
           return approvedTx;
         }
         return tx;
-      });
-
-      try {
-        localStorage.setItem('wadaage_driver_wallet_transactions', JSON.stringify(updatedList));
-      } catch (_e) {}
-
-      return updatedList;
-    });
-
-    if (approvedTxObj) {
-      const approvedTx: DriverWalletTransaction = approvedTxObj;
-      // Apply balance update across all key aliases
-      const calculatedNewBalUsd = applyDriverBalanceUpdate(targetDriverId, targetDriverPhone, creditedUsd, false);
-
-      saveTransactionToFirestore(approvedTx);
-      fetch(getApiUrl('/api/db/wallet-transactions'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...approvedTx,
-          alreadyCreditedOnFrontend: true,
-          newBalanceUsd: calculatedNewBalUsd,
-        }),
-      }).catch(() => {});
-
-      broadcastRideEvent('DRIVER_WALLET_UPDATED', {
-        driverId: targetDriverId,
-        driverPhone: targetDriverPhone,
-        amountUsd: creditedUsd,
-        amountSos: creditedSos,
-        newBalanceUsd: calculatedNewBalUsd,
-        tx: approvedTx,
-      });
-    }
+      })
+    );
   };
 
   const rejectDriverPendingTransaction = (txId: string, adminNote?: string) => {
@@ -4970,16 +4931,15 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem('wadaage_driver_trip_history');
     } catch {}
 
-    // Preserve existing wallet balance if driver already has funds, else initialize 0.00
-    const existingBal = getDriverWalletBalance(newDriverUser.id) || getDriverWalletBalance(cleanPhone) || 0.00;
+    // Initialize fresh $0.00 wallet balance for new driver across all key aliases
     setDriverWallets((prev) => {
       const updated = {
         ...prev,
-        [newDriverUser.id]: existingBal,
-        [newDriverUser.phone]: existingBal,
-        [cleanPhone]: existingBal,
-        [`+252 ${cleanPhone}`]: existingBal,
-        [`+252${cleanPhone}`]: existingBal,
+        [newDriverUser.id]: 0.00,
+        [newDriverUser.phone]: 0.00,
+        [cleanPhone]: 0.00,
+        [`+252 ${cleanPhone}`]: 0.00,
+        [`+252${cleanPhone}`]: 0.00,
       };
       try {
         localStorage.setItem('wadaage_driver_wallets_map', JSON.stringify(updated));
@@ -4999,8 +4959,8 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
       status: isAutoApproved ? 'available' : 'offline',
       isVerified: isAutoApproved,
       kycStatus: isAutoApproved ? 'approved' : 'pending',
-      walletBalanceUsd: existingBal,
-      wallet_balance_usd: existingBal,
+      walletBalanceUsd: 0.00,
+      wallet_balance_usd: 0.00,
       documentsVerified: {
         driverLicense: isAutoApproved,
         vehicleInsurance: isAutoApproved,
