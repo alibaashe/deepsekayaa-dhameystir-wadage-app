@@ -35,6 +35,7 @@ import { SomalilandFlag } from '../Common/SomalilandFlag';
 import { INITIAL_REGISTERED_USERS, INITIAL_DRIVERS, INITIAL_DRIVER_APPLICATIONS } from '../../data/mockData';
 import { secureStorage, safeJsonParse, isPhoneMatch, normalizeSomalilandPhone } from '../../utils/security';
 import { verifyCredentialsOnline } from '../../services/firebase';
+import { RiderAuthFlow } from './RiderAuthFlow';
 
 // Helper to keep local device storage updated with verified credentials
 const syncUserToLocalCache = (user: any, verifiedPassword?: string) => {
@@ -129,6 +130,7 @@ export const LoginScreen: React.FC = () => {
     drivers,
     driverApplications,
     role,
+    setRole,
     language,
     setLanguage,
     t,
@@ -136,6 +138,17 @@ export const LoginScreen: React.FC = () => {
 
   // Selected role is locked directly to the active standalone application
   const selectedRole: UserRole = role || 'passenger';
+
+  // For Rider role, render the modern 6-screen Wadaage Share onboarding & login flow
+  if ((selectedRole as string) === 'passenger') {
+    return (
+      <RiderAuthFlow
+        onSwitchToDriver={() => setRole('driver')}
+        onSwitchToAdmin={() => setRole('admin')}
+      />
+    );
+  }
+
   const [isRegisterMode, setIsRegisterMode] = useState(true);
   const [showDriverKycModal, setShowDriverKycModal] = useState(false);
 

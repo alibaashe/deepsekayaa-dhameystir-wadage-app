@@ -108,21 +108,20 @@ export async function sendWhatsAppOtp(
 }
 
 /**
- * Verifies the user-entered OTP against active OTP store
+ * Verifies the user-entered OTP against active OTP store and WhatsApp Cloud API
  */
 export async function verifyWhatsAppOtp(phone: string, inputCode: string, userData?: any, userRole?: string): Promise<OtpVerifyResult> {
   const normalizedPhone = formatSomalilandPhone(phone);
   const trimmedCode = inputCode.trim();
 
-  // Master bypass code for emergency administration
-  if (trimmedCode === '123456' || trimmedCode === '888888' || trimmedCode === '1234') {
+  if (!trimmedCode || trimmedCode.length < 4) {
     return {
-      success: true,
-      message: '✅ Lambarkaaga WhatsApp waxaa si sax ah u xaqiijiyay Wadaage App!',
+      success: false,
+      message: 'Fadlan geli koodka xaqiijinta ee 6-da god ah (Enter complete 6-digit WhatsApp OTP)',
     };
   }
 
-  // Attempt server verification first
+  // Attempt server-side WhatsApp Cloud API verification first
   try {
     const res = await fetch(getApiUrl('/api/whatsapp/verify-otp'), {
       method: 'POST',

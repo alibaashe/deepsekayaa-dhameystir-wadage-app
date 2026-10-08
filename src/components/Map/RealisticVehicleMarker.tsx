@@ -10,6 +10,7 @@ interface RealisticVehicleMarkerProps {
   isAssigned?: boolean;
   isLiveGps?: boolean;
   showDetails?: boolean;
+  showSpeechBubble?: boolean;
   size?: 'sm' | 'md' | 'lg';
 }
 
@@ -22,6 +23,7 @@ export const RealisticVehicleMarker: React.FC<RealisticVehicleMarkerProps> = ({
   isAssigned = false,
   isLiveGps = false,
   showDetails = false,
+  showSpeechBubble = false,
   size = 'md',
 }) => {
   const colorDef = resolveVehicleColor(color);

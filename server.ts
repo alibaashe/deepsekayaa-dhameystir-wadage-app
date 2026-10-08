@@ -52,18 +52,20 @@ let whatsappRuntimeConfig = {
   provider: 'meta_cloud', // 'meta_cloud' | 'ultramsg' | 'twilio' | 'custom_webhook'
   adminNumber: '252636807814',
   senderName: 'Wadaage Mobility Somaliland',
-  metaPhoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
-  metaApiToken: process.env.WHATSAPP_CLOUD_API_TOKEN || process.env.WHATSAPP_TOKEN || '',
+  metaPhoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '1297794856758656',
+  metaApiToken: process.env.WHATSAPP_CLOUD_API_TOKEN || process.env.WHATSAPP_TOKEN || 'EAGXHZCxyX8UcBSmO8xaMDm54OGDvivcGBX4wI9pJ6WD1VsSF1WjPagXk20yk4poKZCMrKASqXM2KjxaRkSIZAY69fGLbJZBqYFuvttJLT3QmZABMM3p3NVJbGxur8WOkm6ZAnIn3uveZAGgkhAsR14PUZAzqCnTTJ6LrAjEr4FghWHGSnvn1ZBSlsiztSK9F4mSvRsQZDZD',
+  verifyToken: process.env.WHATSAPP_VERIFY_TOKEN || 'WadaageCabiir&123',
   ultraInstanceId: process.env.ULTRAMSG_INSTANCE_ID || '',
   ultraToken: process.env.ULTRAMSG_TOKEN || '',
   twilioSid: process.env.TWILIO_ACCOUNT_SID || '',
   twilioAuthToken: process.env.TWILIO_AUTH_TOKEN || '',
   twilioFrom: process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+14155238886',
-  customWebhookUrl: process.env.WHATSAPP_WEBHOOK_URL || '',
+  customWebhookUrl: process.env.WHATSAPP_WEBHOOK_URL || 'https://www.wadaage.com/api/webhook/whatsapp',
+  customGatewayUrl: process.env.WHATSAPP_GATEWAY_URL || 'https://www.wadaage.com/api/whatsapp/send-otp',
   customApiKey: '',
   expiryMinutes: 10,
-  enableMasterBypass: true,
-  masterBypassCode: '123456',
+  enableMasterBypass: false, // Strict WhatsApp verification enabled
+  masterBypassCode: '888888',
   messageTemplate: '🚗 *WADAAGE MOBILITY SOMALILAND*\n\nKoodkaaga xaqiijinta WhatsApp (OTP) waa:\n👉 *{{code}}*\n\nHa la wadaagin qofna koodkan. Koodkani wuxuu dhacayaa {{expiry}} daqiiqo gudahood.\n\n_Wadaage - Gadiidka Casriga ah ee Somaliland (Hargeisa)_',
 };
 
@@ -2599,9 +2601,34 @@ Return ONLY valid JSON matching this schema:
     const phoneNumberId = whatsappRuntimeConfig.metaPhoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID;
     if (metaToken && phoneNumberId) {
       try {
-        // Build payload according to template or direct text
-        const bodyPayload = otpCode
-          ? {
+        // Direct text message payload
+        const directTextPayload = {
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: cleanPhone,
+          type: 'text',
+          text: { preview_url: false, body: messageText },
+        };
+
+        let resp = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${metaToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(directTextPayload),
+        });
+
+        if (resp.ok) {
+          console.log(`[WhatsApp Gateway] Delivered WhatsApp message to +${cleanPhone} via Meta Cloud API`);
+          return { success: true, provider: 'Meta Cloud API', details: 'Delivered via Meta WhatsApp Graph API' };
+        } else {
+          const errText = await resp.text();
+          console.warn(`[WhatsApp Gateway] Direct text delivery note: ${errText}, attempting template...`);
+
+          // Attempt template if configured
+          if (otpCode) {
+            const templatePayload = {
               messaging_product: 'whatsapp',
               to: cleanPhone,
               type: 'template',
@@ -2613,28 +2640,20 @@ Return ONLY valid JSON matching this schema:
                   { type: 'button', sub_type: 'url', index: 0, parameters: [{ type: 'text', text: otpCode }] },
                 ],
               },
-            }
-          : {
-              messaging_product: 'whatsapp',
-              to: cleanPhone,
-              type: 'text',
-              text: { body: messageText },
             };
-
-        const resp = await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}/messages`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${metaToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(bodyPayload),
-        });
-        if (resp.ok) {
-          console.log(`[WhatsApp Gateway] Delivered WhatsApp message to +${cleanPhone} via Meta Cloud API`);
-          return { success: true, provider: 'Meta Cloud API', details: 'Delivered via Meta WhatsApp Graph API v19.0' };
-        } else {
-          const errText = await resp.text();
-          console.error(`[WhatsApp Gateway] Meta Cloud API error:`, errText);
+            const tmplResp = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${metaToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(templatePayload),
+            });
+            if (tmplResp.ok) {
+              console.log(`[WhatsApp Gateway] Delivered WhatsApp message to +${cleanPhone} via Meta Cloud Template`);
+              return { success: true, provider: 'Meta Cloud API (Template)', details: 'Delivered via Meta WhatsApp Template' };
+            }
+          }
         }
       } catch (err: any) {
         console.error(`[WhatsApp Gateway] Error calling Meta Cloud API:`, err?.message || err);
@@ -2705,6 +2724,8 @@ Return ONLY valid JSON matching this schema:
           body: JSON.stringify({
             phone: cleanPhone,
             message: messageText,
+            code: otpCode,
+            otpCode: otpCode,
             sender: whatsappRuntimeConfig.senderName,
           }),
         });
@@ -2886,6 +2907,23 @@ Return ONLY valid JSON matching this schema:
     }
 
     return res.status(400).json({ valid: false, error: 'Invalid OTP code entered' });
+  });
+
+  // WhatsApp Cloud API Webhook Verification & Incoming Hook
+  app.get('/api/webhook/whatsapp', (req, res) => {
+    const mode = req.query['hub.mode'];
+    const token = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+
+    if (mode === 'subscribe' && token === (whatsappRuntimeConfig.verifyToken || 'WadaageCabiir&123')) {
+      console.log('[WhatsApp Webhook] Verification successful');
+      return res.status(200).send(challenge);
+    }
+    return res.sendStatus(403);
+  });
+
+  app.post('/api/webhook/whatsapp', (_req, res) => {
+    return res.status(200).json({ status: 'EVENT_RECEIVED' });
   });
 
   // Get active WhatsApp Gateway Config

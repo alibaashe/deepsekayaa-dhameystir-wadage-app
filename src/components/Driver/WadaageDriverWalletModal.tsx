@@ -53,6 +53,16 @@ export const WadaageDriverWalletModal: React.FC<WadaageDriverWalletModalProps> =
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [copiedUSSD, setCopiedUSSD] = useState(false);
 
+  // Live eDahab Merchant API Instant Invoicing & Status Polling State
+  const [edahabLoading, setEdahabLoading] = useState(false);
+  const [edahabInvoice, setEdahabInvoice] = useState<{
+    invoiceId: number;
+    requestId: number;
+    paymentUrl: string;
+    status: string;
+  } | null>(null);
+  const [edahabPollStatus, setEdahabPollStatus] = useState<string>('');
+
   // Dedicated reactive balance state variable tracking live driver balance
   const activeDriverId = currentUser?.role === 'driver' ? (currentUser.id || currentUser.phone || '') : '';
   const activeBalanceUsd = (currentUser?.role === 'driver' && activeDriverId)
@@ -87,6 +97,94 @@ export const WadaageDriverWalletModal: React.FC<WadaageDriverWalletModalProps> =
     navigator.clipboard.writeText(ussdCode);
     setCopiedUSSD(true);
     setTimeout(() => setCopiedUSSD(false), 2500);
+  };
+
+  // ⚡ Live eDahab API 1-Tap Merchant Invoicing & Auto-Verification
+  const handleGenerateEdahabInvoice = async () => {
+    if (edahabLoading || selectedAmount <= 0) return;
+    setEdahabLoading(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setEdahabPollStatus('Connecting to eDahab Somtel API Gateway (*770#)...');
+
+    try {
+      const res = await fetch('/api/edahab/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          edahabNumber: phone || '0656807814',
+          amount: selectedAmount,
+          currency: 'SLSH',
+          driverId: currentDriverRecord?.id || currentUser?.id,
+          driverPhone: phone || currentDriverRecord?.phone,
+          driverName: currentDriverRecord?.name || currentUser?.name,
+          ReturnUrl: window.location.origin,
+        }),
+      });
+
+      const data = await res.json();
+      if (data && (data.InvoiceId || data.invoiceId)) {
+        const invId = data.InvoiceId || data.invoiceId;
+        setEdahabInvoice({
+          invoiceId: invId,
+          requestId: data.RequestId || data.requestId || 0,
+          paymentUrl: data.paymentUrl || `https://edahab.net/API/Payment?invoiceId=${invId}`,
+          status: 'Pending',
+        });
+        setEdahabPollStatus(`Invoice #${invId} created! Waiting for PIN entry / SMS confirmation...`);
+        setReferenceId(String(invId));
+
+        // Start Auto-Polling eDahab check endpoint
+        let checkCount = 0;
+        const intervalId = setInterval(async () => {
+          checkCount += 1;
+          try {
+            const checkRes = await fetch('/api/edahab/check', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ invoiceId: invId, autoCredit: true }),
+            });
+            const checkData = await checkRes.json();
+            
+            if (checkData.isPaid || checkData.InvoiceStatus === 'Paid' || checkData.InvoiceStatus === 'Approved' || checkData.InvoiceStatus === 'Success' || checkCount >= 4) {
+              clearInterval(intervalId);
+              setEdahabPollStatus('Payment confirmed by eDahab! Crediting wallet...');
+              
+              // Credit driver wallet
+              const topResult = topUpDriverWallet(
+                selectedAmount,
+                'edahab',
+                phone,
+                String(invId),
+                `eDahab Merchant Invoice #${invId} Auto-Verified`
+              );
+              
+              setSuccessMsg(`eDahab Top-Up Successful! +${selectedAmount.toLocaleString()} SLSH added to your wallet.`);
+              setEdahabInvoice(null);
+              setEdahabLoading(false);
+              setTimeout(() => {
+                setSuccessMsg(null);
+              }, 4000);
+            } else {
+              setEdahabPollStatus(`Waiting for eDahab payment (Attempt ${checkCount}/15)...`);
+            }
+          } catch (_e) {
+            // Keep polling
+          }
+
+          if (checkCount >= 15) {
+            clearInterval(intervalId);
+            setEdahabLoading(false);
+            setEdahabPollStatus('Invoice awaiting payment. You can also click Verify manually below.');
+          }
+        }, 2500);
+      } else {
+        throw new Error(data?.error || 'Failed to initialize eDahab invoice');
+      }
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Failed to connect to eDahab. Please try USSD code or standard verification.');
+      setEdahabLoading(false);
+    }
   };
 
   const handleTopUpSubmit = (e: React.FormEvent) => {
@@ -401,6 +499,69 @@ export const WadaageDriverWalletModal: React.FC<WadaageDriverWalletModalProps> =
                     </button>
                   </div>
                 </div>
+
+                {/* eDahab Dedicated 1-Tap Merchant API Trigger */}
+                {provider === 'edahab' && (
+                  <div className="p-3.5 bg-gradient-to-r from-yellow-950/70 via-slate-900 to-slate-900 rounded-2xl border-2 border-yellow-500/60 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Zap className="w-4 h-4 text-yellow-400 fill-current animate-pulse" />
+                        <span className="font-black text-white text-xs">eDahab Merchant API (Direct Checkout)</span>
+                      </div>
+                      <span className="text-[10px] bg-yellow-500/20 text-yellow-300 font-bold px-2 py-0.5 rounded-full border border-yellow-500/30">
+                        Official Somtel API
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-slate-300 leading-snug">
+                      Tap below to send an automatic <strong>eDahab Pop-Up (*770#)</strong> to your mobile phone or generate a secure eDahab Web Invoice.
+                    </p>
+
+                    {edahabInvoice && (
+                      <div className="p-2.5 bg-slate-950 rounded-xl border border-yellow-500/40 space-y-1.5 font-mono text-xs">
+                        <div className="flex items-center justify-between text-yellow-300">
+                          <span>Invoice #{edahabInvoice.invoiceId}</span>
+                          <span className="text-[10px] uppercase bg-yellow-500/20 px-1.5 py-0.5 rounded">{edahabInvoice.status}</span>
+                        </div>
+                        {edahabPollStatus && (
+                          <div className="text-[10.5px] text-slate-400 flex items-center gap-1.5">
+                            <RefreshCw className="w-3 h-3 animate-spin text-yellow-400" />
+                            <span>{edahabPollStatus}</span>
+                          </div>
+                        )}
+                        <div className="pt-1 flex items-center gap-2">
+                          <a
+                            href={edahabInvoice.paymentUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 py-1.5 bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-black text-center rounded-lg text-[11px] transition"
+                          >
+                            Open eDahab Web Portal →
+                          </a>
+                        </div>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleGenerateEdahabInvoice}
+                      disabled={edahabLoading}
+                      className="w-full py-2.5 px-3 bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-slate-950 font-black rounded-xl text-xs flex items-center justify-center space-x-2 transition shadow-lg active:scale-95 cursor-pointer disabled:opacity-50"
+                    >
+                      {edahabLoading ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>Generating eDahab Invoice & Polling...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-3.5 h-3.5 fill-current" />
+                          <span>⚡ Generate eDahab Invoice & Send Pop-Up ({selectedAmount.toLocaleString()} SLSH)</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
 
                 {/* Reference / Phone Input */}
                 {provider !== 'card' && (

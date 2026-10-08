@@ -16,23 +16,64 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
     <link rel="manifest" href="/manifest.json" />
+    <script>
+      (function() {
+        // Intercept Google Maps authorization & referer restriction messages before any scripts run
+        var originalConsoleError = console.error;
+        console.error = function() {
+          var args = Array.prototype.slice.call(arguments);
+          var fullText = args.map(function(item) {
+            if (typeof item === 'object') {
+              try { return (item && item.message) ? item.message : JSON.stringify(item); } catch(e) { return String(item); }
+            }
+            return String(item || '');
+          }).join(' ');
+
+          if (
+            fullText.indexOf('RefererNotAllowedMapError') !== -1 ||
+            fullText.indexOf('Google Maps JavaScript API error') !== -1 ||
+            fullText.indexOf('Referer denied') !== -1 ||
+            fullText.indexOf('gm_authFailure') !== -1
+          ) {
+            console.warn('[Handled Google Maps Notice]: Key has HTTP referrer restrictions in GCP. Gracefully activating Google live raster tiles.', fullText);
+            window.__googleMapsAuthFailed = true;
+            window.__googleMapsRefererError = true;
+            try {
+              window.dispatchEvent(new CustomEvent('google-maps-auth-failure', { detail: fullText }));
+            } catch(err) {}
+            return;
+          }
+          originalConsoleError.apply(console, args);
+        };
+
+        window.gm_authFailure = function () {
+          console.warn('[Google Maps] Referrer restriction detected. Gracefully activating Google live raster tiles.');
+          window.__googleMapsAuthFailed = true;
+          window.__googleMapsRefererError = true;
+          try {
+            window.dispatchEvent(new CustomEvent('google-maps-auth-failure'));
+          } catch(err) {}
+        };
+
+        window.addEventListener('error', function (event) {
+          var msg = (event && event.message) ? event.message : '';
+          if (msg.indexOf('RefererNotAllowedMapError') !== -1 || msg.indexOf('Google Maps JavaScript API error') !== -1) {
+            console.warn('[Google Maps] RefererNotAllowedMapError caught gracefully.');
+            window.__googleMapsAuthFailed = true;
+            window.__googleMapsRefererError = true;
+            try {
+              window.dispatchEvent(new CustomEvent('google-maps-auth-failure'));
+            } catch(err) {}
+            if (event.preventDefault) event.preventDefault();
+            if (event.stopPropagation) event.stopPropagation();
+          }
+        }, true);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script>
-      window.gm_authFailure = function () {
-        console.warn('[Google Maps] Referrer or Auth restriction detected. Activating MapLibre layer.');
-        window.__googleMapsAuthFailed = true;
-        window.dispatchEvent(new CustomEvent('google-maps-auth-failure'));
-      };
-      window.addEventListener('error', function (event) {
-        if (event && (event.message && (event.message.includes('RefererNotAllowedMapError') || event.message.includes('Google Maps JavaScript API error')))) {
-          console.warn('[Google Maps] RefererNotAllowedMapError caught gracefully.');
-          window.__googleMapsAuthFailed = true;
-          window.dispatchEvent(new CustomEvent('google-maps-auth-failure'));
-          if (event.preventDefault) event.preventDefault();
-        }
-      });
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js').catch(() => {});

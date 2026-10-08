@@ -78,6 +78,7 @@ import { notificationService } from '../../services/notificationService';
 import { voiceNavigationService } from '../../services/voiceNavigationService';
 import { sounds } from '../../utils/audio';
 import { WadaageLogo } from '../Common/WadaageLogo';
+import { WadaageShareHeaderLogo } from '../Auth/RiderAuthGraphics';
 
 export const MobileDriverApp: React.FC = () => {
   const {
