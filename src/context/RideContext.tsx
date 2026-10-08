@@ -1512,7 +1512,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ====================================================
   const METER_FIRST_KM_SLSH = 12000; // Flag drop / base fare covering the 1st kilometer
   const METER_EXTRA_KM_SLSH = 7000;  // Charged for every KM after the 1st one
-  const METER_MIN_GPS_STEP_KM = 0.008; // Ignore GPS jitter smaller than ~8 metres
+  const METER_MIN_GPS_STEP_KM = 0.002; // Ignore GPS jitter smaller than ~2 metres for smooth live counting
   const TAXIMETER_STATE_STORAGE_KEY = 'wadaage_taximeter_state';
 
   const [meterKm, setMeterKm] = useState<number>(0);
@@ -1765,6 +1765,126 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     accumulateMeterFromGpsRef.current = accumulateMeterFromGps;
   }, [accumulateMeterFromGps]);
+
+  // Real-Time Active Trip Driving Telematics Progression Loop
+  // Advances assigned driver along real road route in real-time at real driving pace (~30-40 km/h)
+  const routeProgressionIndexRef = useRef<number>(0);
+  const routeSubStepRef = useRef<number>(0);
+  const activeTripRouteRideIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!currentRide || (currentRide.status !== 'in_progress' && currentRide.status !== 'accepted')) {
+      activeTripRouteRideIdRef.current = null;
+      routeProgressionIndexRef.current = 0;
+      routeSubStepRef.current = 0;
+      return;
+    }
+
+    const assignedDriverId = currentRide.assignedDriverId || 'drv_01';
+    const isDriverRole = roleRef.current === 'driver';
+
+    // Reset index on new trip
+    if (activeTripRouteRideIdRef.current !== currentRide.id) {
+      activeTripRouteRideIdRef.current = currentRide.id;
+      routeProgressionIndexRef.current = 0;
+      routeSubStepRef.current = 0;
+    }
+
+    // Determine target route points
+    let points: [number, number][] = [];
+    if (currentRide.status === 'accepted') {
+      // Route from driver current position to pickup
+      const currentDrvLoc = driversRef.current.find(d => d.id === assignedDriverId || (currentUser?.phone && d.phone === currentUser.phone))?.currentLocation;
+      const start = currentDrvLoc || { lat: currentRide.pickup.lat - 0.008, lng: currentRide.pickup.lng - 0.008 };
+      points = [
+        [start.lng, start.lat],
+        [start.lng + (currentRide.pickup.lng - start.lng) * 0.25, start.lat + (currentRide.pickup.lat - start.lat) * 0.25],
+        [start.lng + (currentRide.pickup.lng - start.lng) * 0.50, start.lat + (currentRide.pickup.lat - start.lat) * 0.50],
+        [start.lng + (currentRide.pickup.lng - start.lng) * 0.75, start.lat + (currentRide.pickup.lat - start.lat) * 0.75],
+        [currentRide.pickup.lng, currentRide.pickup.lat]
+      ];
+    } else {
+      // status === 'in_progress'
+      if (roadRoute?.coordinates && roadRoute.coordinates.length > 1) {
+        points = roadRoute.coordinates;
+      } else {
+        const start = currentRide.pickup;
+        const end = currentRide.dropoff;
+        points = [
+          [start.lng, start.lat],
+          [start.lng + (end.lng - start.lng) * 0.25, start.lat + (end.lat - start.lat) * 0.25],
+          [start.lng + (end.lng - start.lng) * 0.50, start.lat + (end.lat - start.lat) * 0.50],
+          [start.lng + (end.lng - start.lng) * 0.75, start.lat + (end.lat - start.lat) * 0.75],
+          [end.lng, end.lat]
+        ];
+      }
+    }
+
+    if (points.length < 2) return;
+
+    const driveTicker = setInterval(() => {
+      // Check if real hardware GPS is actively moving
+      if (isDriverRole && driverGpsStatus.active && driverGpsStatus.isRealHardwareGps && (driverGpsStatus.speed || 0) > 2) {
+        return; // Hardware GPS is providing real motion fixes
+      }
+
+      const curIdx = routeProgressionIndexRef.current;
+      if (curIdx >= points.length - 1) return;
+
+      const p1 = points[curIdx];
+      const p2 = points[curIdx + 1];
+
+      // Interpolate along segment p1 -> p2
+      const stepSubIndex = routeSubStepRef.current + 1;
+      routeSubStepRef.current = stepSubIndex;
+      const t = stepSubIndex / 5;
+
+      const nextLng = p1[0] + (p2[0] - p1[0]) * t;
+      const nextLat = p1[1] + (p2[1] - p1[1]) * t;
+
+      const heading = Math.round(calculateBearing({ lat: p1[1], lng: p1[0] }, { lat: p2[1], lng: p2[0] }));
+
+      if (stepSubIndex >= 5) {
+        routeProgressionIndexRef.current = curIdx + 1;
+        routeSubStepRef.current = 0;
+      }
+
+      // Update driver position in state
+      setDrivers((prev) => {
+        return prev.map((d) => {
+          if (d.id === assignedDriverId || (currentUser?.phone && d.phone === currentUser.phone)) {
+            return {
+              ...d,
+              currentLocation: { lat: nextLat, lng: nextLng },
+              currentHeading: heading,
+            };
+          }
+          return d;
+        });
+      });
+
+      // Feed taximeter odometer during in_progress
+      if (currentRide.status === 'in_progress') {
+        try {
+          accumulateMeterFromGpsRef.current(nextLat, nextLng);
+        } catch {}
+      }
+
+      // Broadcast telemetry
+      broadcastRideEvent('DRIVER_LOCATION_UPDATE', {
+        driver: {
+          id: assignedDriverId,
+          lat: nextLat,
+          lng: nextLng,
+          heading,
+          speed: 35,
+          status: 'busy',
+        },
+      });
+    }, 1000);
+
+    return () => clearInterval(driveTicker);
+  }, [currentRide?.id, currentRide?.status, roadRoute, driverGpsStatus.active, driverGpsStatus.isRealHardwareGps, driverGpsStatus.speed, currentUser?.phone]);
 
   // Sync currentRide to localStorage for session persistence across refreshes and app closes.
   // PERFORMANCE: this effect re-runs on every `currentRide` identity change - and the
