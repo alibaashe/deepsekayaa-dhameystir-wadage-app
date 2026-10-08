@@ -5,10 +5,6 @@ import {
   Volume2,
   VolumeX,
   AlertTriangle,
-  CornerUpLeft,
-  ArrowUp,
-  ArrowUpRight,
-  Sparkles,
   GitFork,
   X,
   Fuel,
@@ -258,57 +254,8 @@ export const DriverMap: React.FC<DriverMapProps> = ({ height = '100%' }) => {
       </div>
 
       {/* =========================================================================
-          NON-OVERLAPPING TURN-BY-TURN HUD OVERLAYS (TEXT OVERLAP PREVENTION)
+          MAP CONTROLS AND OVERLAYS
           ========================================================================= */}
-
-      {/* 1. TOP TURN-BY-TURN NAVIGATION BANNER */}
-      {isNavActive && (
-        <div className="absolute top-3 inset-x-3 z-40 pointer-events-auto max-w-sm mx-auto">
-          <div className="bg-[#004D40] text-white rounded-3xl p-3.5 shadow-2xl border border-emerald-600/40 animate-slideDown">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center space-x-3 min-w-0">
-                <div className="flex flex-col items-center justify-center shrink-0">
-                  <CornerUpLeft className="w-7 h-7 text-white stroke-[3]" />
-                  <span className="text-[11px] font-black text-emerald-200 font-mono mt-0.5">
-                    300 ft
-                  </span>
-                </div>
-                <div className="min-w-0">
-                  <h3 className="text-xl font-black text-white tracking-tight truncate">
-                    15th St
-                  </h3>
-                  <div className="flex items-center space-x-2 mt-1">
-                    <div className="p-1 rounded-md bg-white text-[#004D40]">
-                      <CornerUpLeft className="w-3.5 h-3.5 stroke-[3]" />
-                    </div>
-                    <div className="p-1 rounded-md text-emerald-200/60">
-                      <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
-                    </div>
-                    <div className="p-1 rounded-md text-emerald-200/60">
-                      <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  voiceNavigationService.speak(
-                    'In 300 feet, make a left turn on 15th Street.',
-                    'en',
-                    true
-                  )
-                }
-                className="w-10 h-10 rounded-full bg-white text-blue-600 shadow-lg flex items-center justify-center shrink-0 hover:bg-slate-100 active:scale-95 transition cursor-pointer"
-                title="Google AI Voice Assistant"
-              >
-                <Sparkles className="w-5 h-5 text-blue-600 fill-blue-500" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 2. SPEED LIMIT & SPEEDOMETER BADGE (BOTTOM-LEFT) */}
       <div className="absolute left-3 bottom-20 z-30 pointer-events-auto flex items-center space-x-2">
