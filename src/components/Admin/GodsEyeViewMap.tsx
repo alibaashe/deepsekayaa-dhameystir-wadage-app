@@ -58,7 +58,7 @@ export const GodsEyeViewMap: React.FC<GodsEyeViewMapProps> = ({ isOpen, onClose 
 
         {/* Real Live Map Container */}
         <div className="flex-1 rounded-2xl relative overflow-hidden border border-slate-800 shadow-inner min-h-[350px]">
-          <UnifiedMap height="100%" showSurgeHeatmap={true} />
+          <UnifiedMap height="100%" showSurgeHeatmap={true} mode="admin" />
         </div>
 
         {/* Footer Fleet Telematics Bar */}
