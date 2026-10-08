@@ -21,16 +21,12 @@ import { useRide } from '../../context/RideContext';
 import { DRIVER_MAP_STYLE } from './mapStyles';
 import { RealisticVehicleMarker } from './RealisticVehicleMarker';
 import { voiceNavigationService } from '../../services/voiceNavigationService';
+import { getGoogleMapsApiKey } from '../../utils/googleMapsKey';
 
 interface DriverMapProps {
   height?: string;
   showSurgeHeatmap?: boolean;
 }
-
-const GOOGLE_MAPS_KEY =
-  (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY ||
-  (import.meta as any).env?.VITE_GOOGLE_MAPS_PLATFORM_KEY ||
-  'AIzaSyBAOVGm7NLFbVZdx2GCsn5_YjdYQVry_4w';
 
 export const DriverMap: React.FC<DriverMapProps> = ({ height = '100%' }) => {
   const {
@@ -42,7 +38,6 @@ export const DriverMap: React.FC<DriverMapProps> = ({ height = '100%' }) => {
     roadDurationMins,
     driverGpsStatus,
     drivers,
-    role,
   } = useRide();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -131,12 +126,13 @@ export const DriverMap: React.FC<DriverMapProps> = ({ height = '100%' }) => {
       return;
     }
 
+    const key = getGoogleMapsApiKey();
     const scriptId = 'google-maps-js-sdk';
     if (!document.getElementById(scriptId)) {
       const script = document.createElement('script');
       script.id = scriptId;
       script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(
-        GOOGLE_MAPS_KEY
+        key
       )}&libraries=geometry,places`;
       script.async = true;
       script.onload = () => setIsSdkLoaded(true);
@@ -164,7 +160,7 @@ export const DriverMap: React.FC<DriverMapProps> = ({ height = '100%' }) => {
       const poly = new google.maps.Polyline({
         map: gMap,
         strokeColor: '#2563EB', // Smooth bold blue routing polyline
-        strokeOpacity: 0.9,
+        strokeOpacity: 0.95,
         strokeWeight: 8,
       });
       polylineRef.current = poly;
@@ -219,26 +215,6 @@ export const DriverMap: React.FC<DriverMapProps> = ({ height = '100%' }) => {
     setTimeout(() => setHazardSuccessMsg(null), 4000);
   };
 
-  // Convert Lat/Lng to Screen Offset
-  const toScreenCoord = useCallback(
-    (lat: number, lng: number) => {
-      const scale = Math.pow(2, zoom);
-      const centerRad = (center.lat * Math.PI) / 180;
-      const pointRad = (lat * Math.PI) / 180;
-
-      const x = ((lng - center.lng) / 360) * scale * 256 + dimensions.width / 2;
-      const y =
-        (((Math.asinh(Math.tan(centerRad)) - Math.asinh(Math.tan(pointRad))) / Math.PI) *
-          scale *
-          256) /
-          2 +
-        dimensions.height / 2;
-
-      return { x, y };
-    },
-    [center, zoom, dimensions]
-  );
-
   const cx = dimensions.width / 2;
   const cy = dimensions.height / 2;
 
@@ -248,7 +224,7 @@ export const DriverMap: React.FC<DriverMapProps> = ({ height = '100%' }) => {
       className="w-full relative overflow-hidden select-none font-sans bg-slate-900"
       style={{ height }}
     >
-      {/* 3D DRIVING CAMERA & VECTOR ROADWAY CONTAINER */}
+      {/* 3D DRIVING CAMERA & VECTOR MAP CANVAS CONTAINER */}
       <div
         className="absolute inset-0 w-full h-full overflow-hidden"
         style={{
@@ -261,56 +237,6 @@ export const DriverMap: React.FC<DriverMapProps> = ({ height = '100%' }) => {
       >
         {/* Google Map SDK Canvas Element */}
         <div ref={mapDomRef} className="absolute inset-0 w-full h-full z-0" />
-
-        {/* Clean 2D Navigation Road Corridor Overlay */}
-        <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
-          <defs>
-            <linearGradient id="driverRouteGrad" x1="0%" y1="100%" x2="0%" y2="0%">
-              <stop offset="0%" stopColor="#1D4ED8" />
-              <stop offset="100%" stopColor="#3B82F6" />
-            </linearGradient>
-
-            <filter id="driverGlow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#2563EB" floodOpacity="0.45" />
-            </filter>
-          </defs>
-
-          {/* Road Asphalt Corridor */}
-          <path
-            d={`M ${cx},${cy + 220} L ${cx},${cy - 20} L ${cx - 180},${cy - 90}`}
-            fill="none"
-            stroke="#475569"
-            strokeWidth="52"
-            strokeLinecap="round"
-          />
-          {/* Dashed Lane Divider */}
-          <path
-            d={`M ${cx},${cy + 220} L ${cx},${cy - 20} L ${cx - 180},${cy - 90}`}
-            fill="none"
-            stroke="#FFFFFF"
-            strokeWidth="2.5"
-            strokeDasharray="12 16"
-          />
-
-          {/* Bold Blue Smooth Navigation Polyline */}
-          <path
-            d={`M ${cx},${cy + 220} L ${cx},${cy - 20} L ${cx - 180},${cy - 90}`}
-            fill="none"
-            stroke="url(#driverRouteGrad)"
-            strokeWidth="14"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            filter="url(#driverGlow)"
-          />
-          {/* Center Chevron Highlight */}
-          <path
-            d={`M ${cx},${cy + 220} L ${cx},${cy - 20} L ${cx - 180},${cy - 90}`}
-            fill="none"
-            stroke="#93C5FD"
-            strokeWidth="4"
-            strokeLinecap="round"
-          />
-        </svg>
 
         {/* VEHICLE AVATAR MARKER (Crisp top-down avatar with smooth heading rotation around center pivot) */}
         <div

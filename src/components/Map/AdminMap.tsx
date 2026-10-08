@@ -3,16 +3,12 @@ import { Radio, Eye, Layers, Flame, Shield, MapPin, ZoomIn, ZoomOut, RefreshCw }
 import { useRide } from '../../context/RideContext';
 import { ADMIN_MAP_STYLE } from './mapStyles';
 import { RealisticVehicleMarker } from './RealisticVehicleMarker';
+import { getGoogleMapsApiKey } from '../../utils/googleMapsKey';
 
 interface AdminMapProps {
   height?: string;
   showSurgeHeatmap?: boolean;
 }
-
-const GOOGLE_MAPS_KEY =
-  (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY ||
-  (import.meta as any).env?.VITE_GOOGLE_MAPS_PLATFORM_KEY ||
-  'AIzaSyBAOVGm7NLFbVZdx2GCsn5_YjdYQVry_4w';
 
 // Pre-defined Hargeisa Geofence Dispatch Zones
 const HARGEISA_GEOFENCE_ZONES = [
@@ -98,12 +94,13 @@ export const AdminMap: React.FC<AdminMapProps> = ({
       return;
     }
 
+    const key = getGoogleMapsApiKey();
     const scriptId = 'google-maps-js-sdk';
     if (!document.getElementById(scriptId)) {
       const script = document.createElement('script');
       script.id = scriptId;
       script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(
-        GOOGLE_MAPS_KEY
+        key
       )}&libraries=geometry,places`;
       script.async = true;
       script.onload = () => setIsSdkLoaded(true);
@@ -164,10 +161,7 @@ export const AdminMap: React.FC<AdminMapProps> = ({
   // ----------------------------------------------------
   // MARKER CLUSTERING ALGORITHM FOR HIGH-DENSITY FLEETS
   // ----------------------------------------------------
-  // When hundreds of online drivers exist, aggregate nearby drivers into numbered cluster bubbles
-  // based on grid distance threshold.
   const clusteredDrivers = useMemo(() => {
-    // Grid distance threshold in pixels for clustering
     const clusterPixelDistance = zoom < 12 ? 90 : zoom < 14 ? 65 : 45;
 
     const clusters: Array<{
@@ -186,7 +180,6 @@ export const AdminMap: React.FC<AdminMapProps> = ({
       const lng = drv.currentLocation?.lng ?? 44.0650;
       const pt = toScreenCoord(lat, lng);
 
-      // Find if driver falls within an existing cluster
       let foundCluster = false;
       for (const cl of clusters) {
         const clPt = toScreenCoord(cl.lat, cl.lng);
@@ -195,7 +188,6 @@ export const AdminMap: React.FC<AdminMapProps> = ({
         if (dist < clusterPixelDistance) {
           cl.driversList.push(drv);
           cl.count += 1;
-          // Recalculate cluster centroid
           cl.lat = (cl.lat * (cl.count - 1) + lat) / cl.count;
           cl.lng = (cl.lng * (cl.count - 1) + lng) / cl.count;
           cl.isCluster = cl.count > 1;
@@ -284,7 +276,6 @@ export const AdminMap: React.FC<AdminMapProps> = ({
           const pt = toScreenCoord(item.lat, item.lng);
 
           if (item.isCluster) {
-            // Render Numbered Cluster Bubble
             const isLargeCluster = item.count > 20;
             const isMediumCluster = item.count > 8;
 

@@ -4,16 +4,12 @@ import { useRide } from '../../context/RideContext';
 import { RIDER_MAP_STYLE } from './mapStyles';
 import { findNearestHargeisaPlace } from '../../utils/geo';
 import { RealisticVehicleMarker } from './RealisticVehicleMarker';
+import { getGoogleMapsApiKey } from '../../utils/googleMapsKey';
 
 interface RiderMapProps {
   height?: string;
   selectableMode?: 'pickup' | 'dropoff' | null;
 }
-
-const GOOGLE_MAPS_KEY =
-  (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY ||
-  (import.meta as any).env?.VITE_GOOGLE_MAPS_PLATFORM_KEY ||
-  'AIzaSyBAOVGm7NLFbVZdx2GCsn5_YjdYQVry_4w';
 
 export const RiderMap: React.FC<RiderMapProps> = ({
   height = '100%',
@@ -26,11 +22,13 @@ export const RiderMap: React.FC<RiderMapProps> = ({
     setPickupLocation,
     setDropoffLocation,
     currentRide,
+    roadRoute,
   } = useRide();
 
   const containerRef = useRef<HTMLDivElement>(null);
   const mapDomRef = useRef<HTMLDivElement>(null);
   const googleMapRef = useRef<google.maps.Map | null>(null);
+  const polylineRef = useRef<google.maps.Polyline | null>(null);
 
   const [isSdkLoaded, setIsSdkLoaded] = useState<boolean>(
     typeof window !== 'undefined' && !!(window.google && window.google.maps)
@@ -71,12 +69,13 @@ export const RiderMap: React.FC<RiderMapProps> = ({
       return;
     }
 
+    const key = getGoogleMapsApiKey();
     const scriptId = 'google-maps-js-sdk';
     if (!document.getElementById(scriptId)) {
       const script = document.createElement('script');
       script.id = scriptId;
       script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(
-        GOOGLE_MAPS_KEY
+        key
       )}&libraries=geometry,places`;
       script.async = true;
       script.onload = () => setIsSdkLoaded(true);
@@ -100,6 +99,15 @@ export const RiderMap: React.FC<RiderMapProps> = ({
 
       googleMapRef.current = gMap;
 
+      // Polyline for pickup to destination route overview
+      const poly = new google.maps.Polyline({
+        map: gMap,
+        strokeColor: '#0066FF',
+        strokeOpacity: 0.9,
+        strokeWeight: 6,
+      });
+      polylineRef.current = poly;
+
       gMap.addListener('dragend', () => {
         const c = gMap.getCenter();
         if (c) setCenter({ lat: c.lat(), lng: c.lng() });
@@ -119,6 +127,24 @@ export const RiderMap: React.FC<RiderMapProps> = ({
       console.warn('[RiderMap] Google Maps initialization notice:', e);
     }
   }, [isSdkLoaded]);
+
+  // Update polyline route path
+  useEffect(() => {
+    const poly = polylineRef.current;
+    if (!poly) return;
+
+    if (roadRoute?.coordinates && roadRoute.coordinates.length > 1) {
+      const path = roadRoute.coordinates.map(([lng, lat]) => ({ lat, lng }));
+      poly.setPath(path);
+    } else if (pickupLocation && dropoffLocation) {
+      poly.setPath([
+        { lat: pickupLocation.lat, lng: pickupLocation.lng },
+        { lat: dropoffLocation.lat, lng: dropoffLocation.lng },
+      ]);
+    } else {
+      poly.setPath([]);
+    }
+  }, [roadRoute, pickupLocation, dropoffLocation]);
 
   const handleLocationSelect = useCallback(
     (lat: number, lng: number) => {
@@ -173,8 +199,6 @@ export const RiderMap: React.FC<RiderMapProps> = ({
   // ----------------------------------------------------
   // HIGH-PERFORMANCE RENDER LOOP FOR LIVE DRIVER FLEET TRACKING
   // ----------------------------------------------------
-  // We maintain animated driver positions using requestAnimationFrame interpolation (lerp)
-  // to achieve zero frame drops even during rapid WebSocket updates.
   const [animatedDriverPositions, setAnimatedDriverPositions] = useState<
     Array<{ id: string; lat: number; lng: number; heading: number; model: string; color: string }>
   >([]);
@@ -221,7 +245,7 @@ export const RiderMap: React.FC<RiderMapProps> = ({
       driverTargetsRef.current.forEach((target, id) => {
         const curr = driverCurrentsRef.current.get(id);
         if (curr) {
-          // Smooth linear interpolation (lerp factor 0.1)
+          // Smooth linear interpolation (lerp factor 0.12)
           const newLat = curr.lat + (target.lat - curr.lat) * 0.12;
           const newLng = curr.lng + (target.lng - curr.lng) * 0.12;
           const newHeading = curr.heading + (target.heading - curr.heading) * 0.12;
