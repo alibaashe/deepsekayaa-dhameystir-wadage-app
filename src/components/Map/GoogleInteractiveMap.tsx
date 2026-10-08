@@ -410,15 +410,16 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
         const screenX = tilePixelX - centerPixel.x + dimensions.width / 2;
         const screenY = tilePixelY - centerPixel.y + dimensions.height / 2;
 
-        let url = `https://mt1.google.com/vt/lyrs=m&x=${tx}&y=${ty}&z=${zoom}&hl=en`;
+        const mtSubdomain = `mt${Math.abs(tx + ty) % 4}.google.com`;
+        let url = `https://${mtSubdomain}/vt/lyrs=m&x=${tx}&y=${ty}&z=${zoom}&scale=2&hl=en`;
         let fallbackUrl = `https://a.basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${tx}/${ty}.png`;
 
         if (mapLayer === 'satellite') {
-          url = `https://mt1.google.com/vt/lyrs=y&x=${tx}&y=${ty}&z=${zoom}&hl=en`;
+          url = `https://${mtSubdomain}/vt/lyrs=y&x=${tx}&y=${ty}&z=${zoom}&scale=2&hl=en`;
           fallbackUrl = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${ty}/${tx}`;
         } else if (mapLayer === 'dark') {
           url = `https://a.basemaps.cartocdn.com/dark_all/${zoom}/${tx}/${ty}.png`;
-          fallbackUrl = `https://mt1.google.com/vt/lyrs=m&x=${tx}&y=${ty}&z=${zoom}&hl=en`;
+          fallbackUrl = `https://${mtSubdomain}/vt/lyrs=m&x=${tx}&y=${ty}&z=${zoom}&scale=2&hl=en`;
         }
 
         list.push({
@@ -631,7 +632,7 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
 
           return (
             <div
-              className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-all duration-300 ease-out z-25"
+              className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-all duration-500 ease-linear z-25"
               style={{ left: `${pt.x}px`, top: `${pt.y}px` }}
             >
               <RealisticVehicleMarker
@@ -667,7 +668,7 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
           return (
             <div
               key={`fleet_driver_${driver.id || idx}_${idx}`}
-              className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20 hover:z-30"
+              className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-all duration-500 ease-linear z-20 hover:z-30"
               style={{ left: `${pt.x}px`, top: `${pt.y}px` }}
             >
               <RealisticVehicleMarker

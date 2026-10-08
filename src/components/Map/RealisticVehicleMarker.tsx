@@ -79,7 +79,7 @@ export const RealisticVehicleMarker: React.FC<RealisticVehicleMarkerProps> = ({
 
       {/* Realistic Top-Down Rotating Car Body */}
       <div
-        className="relative transition-transform duration-300 ease-out will-change-transform drop-shadow-[0_6px_10px_rgba(0,0,0,0.45)]"
+        className="relative transition-transform duration-500 ease-linear will-change-transform drop-shadow-[0_6px_10px_rgba(0,0,0,0.45)]"
         style={{
           transform: `rotate(${heading}deg)`,
           width: `${dimensions.width}px`,
