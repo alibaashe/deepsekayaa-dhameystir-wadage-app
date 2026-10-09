@@ -45,6 +45,13 @@ export const RealisticVehicleMarker: React.FC<RealisticVehicleMarkerProps> = ({
 
   return (
     <div className="relative flex flex-col items-center select-none pointer-events-none group">
+      {/* Speech bubble indicator if requested */}
+      {showSpeechBubble && (
+        <div className="mb-2 px-2.5 py-1 bg-white text-slate-900 rounded-xl shadow-xl border border-blue-200 text-[11px] font-black whitespace-nowrap animate-bounce flex items-center gap-1 z-40">
+          <span>👋 Hello, I'm here! (Waan joogaa)</span>
+        </div>
+      )}
+
       {/* Floating Info Badge (For Assigned Driver or Admin View) */}
       {showDetails && (
         <div className="mb-1.5 flex flex-col items-center z-30 animate-in fade-in zoom-in-95 duration-200">
@@ -77,6 +84,11 @@ export const RealisticVehicleMarker: React.FC<RealisticVehicleMarkerProps> = ({
       {/* Target Halo Glow for Live Active Driver */}
       {isAssigned && (
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full bg-emerald-500/20 animate-ping pointer-events-none" />
+      )}
+
+      {/* Blue Halo Radar Pulse */}
+      {(isLiveGps || showSpeechBubble) && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full bg-blue-500/25 animate-ping pointer-events-none" />
       )}
 
       {/* Realistic Top-Down Rotating Car Body */}

@@ -75,7 +75,6 @@ import { WadaageDriverDashboard } from './WadaageDriverDashboard';
 import { formatCurrency, EXCHANGE_RATE_USD_TO_SLSH, calculateDistanceKm } from '../../utils/geo';
 import { HARGEISA_PLACES, HargeisaPlace, getHargeisaSearchHaystack } from '../../data/hargeisaPlaces';
 import { notificationService } from '../../services/notificationService';
-import { voiceNavigationService } from '../../services/voiceNavigationService';
 import { sounds } from '../../utils/audio';
 import { WadaageLogo } from '../Common/WadaageLogo';
 import { WadaageShareHeaderLogo } from '../Auth/RiderAuthGraphics';
@@ -127,14 +126,12 @@ export const MobileDriverApp: React.FC = () => {
     isMeterRunning: isLiveMeterRunning,
   } = useRide();
 
-  // Bottom Navigation Active Tab: 'home' | 'my_rides' | 'fuel' | 'earnings' | 'profile' | 'active_ride' | 'settings'
+  // Active View Tab: 'home' | 'my_rides' | 'fuel' | 'earnings' | 'profile' | 'active_ride' | 'settings'
   const [activeTab, setActiveTab] = useState<'home' | 'my_rides' | 'fuel' | 'earnings' | 'profile' | 'active_ride' | 'settings'>('home');
   const [viewMapOverlay, setViewMapOverlay] = useState(false);
-  const [cleanMapNavMode, setCleanMapNavMode] = useState(false);
   const [isFullMapMode, setIsFullMapMode] = useState(true);
   const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
   const [activeCarpoolRider, setActiveCarpoolRider] = useState<'A' | 'B'>('A');
-  const [isVoiceMuted, setIsVoiceMuted] = useState(voiceNavigationService.isVoiceMuted());
   const [mapZoom, setMapZoom] = useState(14);
   const [dismissKycBanner, setDismissKycBanner] = useState(false);
 
@@ -626,42 +623,6 @@ export const MobileDriverApp: React.FC = () => {
               </span>
             </button>
 
-            {/* Clean Map / Live Waze Navigation Toggle */}
-            <button
-              type="button"
-              onClick={() => {
-                const nextState = !cleanMapNavMode;
-                setCleanMapNavMode(nextState);
-                if (nextState) {
-                  voiceNavigationService.speak('Clean Map Navigation mode enabled. Real-time guidance active.', 'en');
-                }
-              }}
-              className={`w-10 h-10 rounded-2xl backdrop-blur-md shadow-md border flex items-center justify-center active:scale-95 transition cursor-pointer ${
-                cleanMapNavMode ? 'bg-blue-600 text-white border-blue-500 shadow-blue-500/30' : 'bg-white/95 text-slate-700 border-slate-200/80 hover:bg-white'
-              }`}
-              title="Toggle Clean Map Real-Time Navigation (Waze Style)"
-            >
-              <Navigation className="w-5 h-5" />
-            </button>
-
-            {/* Voice Mute / Unmute Toggle */}
-            <button
-              type="button"
-              onClick={() => {
-                const muted = voiceNavigationService.toggleMute();
-                setIsVoiceMuted(muted);
-                if (!muted) {
-                  voiceNavigationService.speak('Voice guidance unmuted', 'en', true);
-                }
-              }}
-              className={`w-10 h-10 rounded-2xl backdrop-blur-md shadow-md border flex items-center justify-center active:scale-95 transition cursor-pointer ${
-                !isVoiceMuted ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-white/95 text-slate-700 border-slate-200/80 hover:bg-white'
-              }`}
-              title={isVoiceMuted ? 'Unmute Navigation Voice' : 'Mute Navigation Voice'}
-            >
-              {!isVoiceMuted ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5 text-slate-400" />}
-            </button>
-
             <button
               type="button"
               onClick={() => recalibrateDriverGps()}
@@ -691,109 +652,6 @@ export const MobileDriverApp: React.FC = () => {
               <Compass className="w-5 h-5 text-slate-700" />
             </button>
           </div>
-
-          {/* CLEAN MAP REAL-TIME NAVIGATION TOP BANNER & FLOATING ACTION SIDEBAR */}
-          {cleanMapNavMode && currentRide && (currentRide.status === 'accepted' || currentRide.status === 'driver_arrived' || currentRide.status === 'in_progress') && (
-            <div className="absolute inset-0 z-30 pointer-events-none flex flex-col justify-between p-3 sm:p-4">
-              {/* TOP WAZE-STYLE LIVE DIRECTION BANNER */}
-              <div className="pointer-events-auto bg-slate-900/95 backdrop-blur-md text-white rounded-3xl p-3.5 shadow-2xl border border-slate-700/80 flex items-center justify-between gap-3 animate-slideDown">
-                <div className="flex items-center space-x-3 min-w-0">
-                  <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-lg shadow-blue-600/30">
-                    <Navigation className="w-6 h-6 animate-pulse" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-[10px] font-black uppercase tracking-wider bg-blue-500/30 text-blue-300 px-2 py-0.5 rounded-full border border-blue-400/30">
-                        {currentRide.status === 'accepted' ? 'Pickup Navigation' : currentRide.status === 'driver_arrived' ? 'At Pickup' : 'Dropoff Navigation'}
-                      </span>
-                      <span className="text-xs font-mono font-extrabold text-amber-400">
-                        {currentRide.durationMins || 8} min ({currentRide.distanceKm || 3.2} km)
-                      </span>
-                    </div>
-                    <h4 className="font-extrabold text-sm text-white truncate mt-0.5">
-                      {currentRide.status === 'in_progress' ? (currentRide.dropoff?.name || 'Destination') : (currentRide.pickup?.name || 'Pickup Point')}
-                    </h4>
-                    <p className="text-[11px] text-slate-300 truncate font-semibold">
-                      {currentRide.status === 'accepted'
-                        ? 'In 200m turn right onto Wadada Wadnaha toward pickup.'
-                        : currentRide.status === 'driver_arrived'
-                        ? 'Arrived. Waiting for passenger to enter vehicle.'
-                        : 'Head straight on Independence Ave toward destination.'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-col space-y-1.5 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const muted = voiceNavigationService.toggleMute();
-                      setIsVoiceMuted(muted);
-                    }}
-                    className={`p-2 rounded-xl text-xs font-bold transition flex items-center space-x-1 ${
-                      !isVoiceMuted ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-slate-800 text-slate-400'
-                    }`}
-                  >
-                    {!isVoiceMuted ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCleanMapNavMode(false)}
-                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* BOTTOM FLOATING SLEEK SIDEBAR CONTROLS (Maximizing Map View) */}
-              <div className="pointer-events-auto bg-slate-900/95 backdrop-blur-md text-white rounded-3xl p-3 shadow-2xl border border-slate-700/80 flex items-center justify-between gap-2 max-w-lg mx-auto w-full">
-                <div className="flex items-center space-x-2 min-w-0">
-                  <div className="w-9 h-9 rounded-xl bg-[#008751] text-white font-black flex items-center justify-center text-xs shrink-0 shadow">
-                    {currentRide.passengerName?.charAt(0) || 'P'}
-                  </div>
-                  <div className="min-w-0">
-                    <span className="font-extrabold text-xs text-white block truncate">{currentRide.passengerName}</span>
-                    <span className="text-[10px] text-emerald-400 font-mono font-bold">${(Number(currentRide.totalFare) || 0).toFixed(2)} USD</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setShowChatModal(true)}
-                    className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 transition"
-                    title="Chat with Passenger"
-                  >
-                    <MessageSquare className="w-4 h-4" />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowCallPassengerModal(true)}
-                    className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 transition"
-                    title="Call Passenger"
-                  >
-                    <PhoneCall className="w-4 h-4" />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      sounds.playButtonClick();
-                      advanceDriverRideState();
-                    }}
-                    className="py-2.5 px-4 rounded-2xl bg-[#008751] hover:bg-[#007345] text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-[#008751]/30 transition active:scale-95 flex items-center space-x-1.5"
-                  >
-                    <CheckCircle className="w-4 h-4" />
-                    <span>
-                      {currentRide.status === 'accepted' ? 'Arrived at Pickup' : currentRide.status === 'driver_arrived' ? 'Start Trip' : 'Complete Trip'}
-                    </span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* RIDE SLIDE-UP OVERLAYS CONTAINER (When incoming request or active ride) */}
           <div className="absolute bottom-3 left-3 right-3 z-30 max-h-[75vh] overflow-y-auto pointer-events-auto space-y-3">
@@ -2654,86 +2512,6 @@ export const MobileDriverApp: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
-
-      {/* 6. BOTTOM WADAAGE BLUE NAVIGATION BAR (Matching image.png) */}
-      {(!currentRide || currentRide.status === 'searching' || currentRide.status === 'idle' || currentRide.status === 'cancelled' || currentRide.status === 'completed') && (
-        <nav className="bg-[#0066f5] border-t border-blue-400/20 px-2 py-2 rounded-t-[1.8rem] shadow-2xl flex items-center justify-around shrink-0 text-white z-30 select-none">
-          {/* Tab 1: HOME */}
-          <button
-            id="nav-tab-home"
-            type="button"
-            onClick={() => setActiveTab('home')}
-            className={`min-h-[44px] px-3 py-1.5 rounded-full flex items-center space-x-1.5 transition-all duration-200 active:scale-95 cursor-pointer ${
-              activeTab === 'home'
-                ? 'bg-white text-[#0066f5] font-black shadow-md'
-                : 'text-white/80 hover:text-white font-bold'
-            }`}
-          >
-            <Home className="w-4 h-4 shrink-0" />
-            <span className="text-[11px] tracking-wider uppercase">HOME</span>
-          </button>
-
-          {/* Tab 2: MY RIDES */}
-          <button
-            id="nav-tab-my-rides"
-            type="button"
-            onClick={() => setActiveTab('my_rides')}
-            className={`min-h-[44px] px-3 py-1.5 rounded-full flex items-center space-x-1.5 transition-all duration-200 active:scale-95 cursor-pointer ${
-              activeTab === 'my_rides'
-                ? 'bg-white text-[#0066f5] font-black shadow-md'
-                : 'text-white/80 hover:text-white font-bold'
-            }`}
-          >
-            <Car className="w-4 h-4 shrink-0" />
-            <span className="text-[11px] tracking-wider uppercase">MY RIDES</span>
-          </button>
-
-          {/* Tab 3: FUEL */}
-          <button
-            id="nav-tab-fuel"
-            type="button"
-            onClick={() => setActiveTab('fuel')}
-            className={`min-h-[44px] px-3 py-1.5 rounded-full flex items-center space-x-1.5 transition-all duration-200 active:scale-95 relative cursor-pointer ${
-              activeTab === 'fuel'
-                ? 'bg-white text-[#0066f5] font-black shadow-md'
-                : 'text-white/80 hover:text-white font-bold'
-            }`}
-          >
-            <FuelIcon className="w-4 h-4 shrink-0" />
-            <span className="text-[11px] tracking-wider uppercase">FUEL</span>
-          </button>
-
-          {/* Tab 4: EARNINGS */}
-          <button
-            id="nav-tab-earnings"
-            type="button"
-            onClick={() => setActiveTab('earnings')}
-            className={`min-h-[44px] px-3 py-1.5 rounded-full flex items-center space-x-1.5 transition-all duration-200 active:scale-95 cursor-pointer ${
-              activeTab === 'earnings'
-                ? 'bg-white text-[#0066f5] font-black shadow-md'
-                : 'text-white/80 hover:text-white font-bold'
-            }`}
-          >
-            <Wallet className="w-4 h-4 shrink-0" />
-            <span className="text-[11px] tracking-wider uppercase">EARNINGS</span>
-          </button>
-
-          {/* Tab 5: PROFILE */}
-          <button
-            id="nav-tab-profile"
-            type="button"
-            onClick={() => setActiveTab('profile')}
-            className={`min-h-[44px] px-3 py-1.5 rounded-full flex items-center space-x-1.5 transition-all duration-200 active:scale-95 cursor-pointer ${
-              activeTab === 'profile'
-                ? 'bg-white text-[#0066f5] font-black shadow-md'
-                : 'text-white/80 hover:text-white font-bold'
-            }`}
-          >
-            <User className="w-4 h-4 shrink-0" />
-            <span className="text-[11px] tracking-wider uppercase">PROFILE</span>
-          </button>
-        </nav>
       )}
 
       {/* 7. DRIVER MENU DRAWER */}
