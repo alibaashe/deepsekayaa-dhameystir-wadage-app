@@ -1,20 +1,17 @@
-// Wadaage Mobility - Interactive Maps Engine (Hargeisa, Somaliland)
+// Wadaage Mobility - Rebuilt High-Performance Google Interactive Map
 import * as React from 'react';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import {
-  Crosshair,
   Layers,
-  Compass,
   Plus,
   Minus,
   MapPin,
-  Car as CarIcon,
   Maximize2,
   Navigation,
 } from 'lucide-react';
 import { useRide } from '../../context/RideContext';
 import { findNearestHargeisaPlace } from '../../utils/geo';
-import { HARGEISA_VERIFIED_LANDMARKS } from '../../data/hargeisaKeyLandmarks';
+import { getGoogleMapsApiKey } from '../../utils/googleMapsKey';
 import { RealisticVehicleMarker } from './RealisticVehicleMarker';
 
 interface GoogleInteractiveMapProps {
@@ -24,25 +21,19 @@ interface GoogleInteractiveMapProps {
   onModeChange?: (mode: 'pickup' | 'dropoff') => void;
 }
 
-// Google Maps API Key resolved from Vite env or process env
-const RAW_GOOGLE_MAPS_KEY =
-  (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY ||
-  (import.meta as any).env?.VITE_GOOGLE_MAPS_PLATFORM_KEY ||
-  (process.env as any).GOOGLE_MAPS_API_KEY ||
-  (process.env as any).GOOGLE_MAPS_PLATFORM_KEY ||
-  '';
-
-const GOOGLE_MAPS_KEY = String(RAW_GOOGLE_MAPS_KEY).trim();
-
-// Clean, modern Google Maps styling for high clarity & road visibility
+// Clean, ultra-minimal Google Maps styling (No POI or place name labels, optimized for car tracking)
 const CLEAN_GOOGLE_MAP_STYLES: google.maps.MapTypeStyle[] = [
   {
     featureType: 'poi',
-    elementType: 'labels.text',
-    stylers: [{ visibility: 'on' }],
+    stylers: [{ visibility: 'off' }],
   },
   {
-    featureType: 'poi.business',
+    featureType: 'transit',
+    stylers: [{ visibility: 'off' }],
+  },
+  {
+    featureType: 'administrative',
+    elementType: 'labels',
     stylers: [{ visibility: 'off' }],
   },
   {
@@ -61,21 +52,18 @@ const CLEAN_GOOGLE_MAP_STYLES: google.maps.MapTypeStyle[] = [
     stylers: [{ color: '#fcd34d' }],
   },
   {
-    featureType: 'transit',
-    stylers: [{ visibility: 'off' }],
-  },
-  {
     featureType: 'water',
     elementType: 'geometry',
     stylers: [{ color: '#c4e0e5' }],
   },
 ];
 
-// Dark theme map styling for night mode
+// Dark theme map styling for night mode (Clean without clutter text)
 const DARK_GOOGLE_MAP_STYLES: google.maps.MapTypeStyle[] = [
   { elementType: 'geometry', stylers: [{ color: '#1d2c4d' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#8ec3b9' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#1a3646' }] },
+  { elementType: 'labels', stylers: [{ visibility: 'off' }] },
+  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
   {
     featureType: 'road',
     elementType: 'geometry',
@@ -93,7 +81,7 @@ const DARK_GOOGLE_MAP_STYLES: google.maps.MapTypeStyle[] = [
   },
 ];
 
-// Spherical Mercator Math Helpers for High-Precision Slippy Google Map Tiles
+// Spherical Mercator Math Helpers for High-Precision Slippy Map Tiles fallback
 function latLngToTile(lat: number, lng: number, zoom: number) {
   const n = Math.pow(2, zoom);
   const rad = (lat * Math.PI) / 180;
@@ -130,7 +118,6 @@ function loadGoogleMapsSdk(apiKey: string): Promise<boolean> {
   if (googleMapsLoaderPromise) return googleMapsLoaderPromise;
 
   googleMapsLoaderPromise = new Promise((resolve) => {
-    // Intercept auth errors
     const previousAuthFailure = (window as any).gm_authFailure;
     (window as any).gm_authFailure = () => {
       console.warn('[Google Maps] gm_authFailure intercepted. Activating high-performance raster mapping.');
@@ -147,7 +134,9 @@ function loadGoogleMapsSdk(apiKey: string): Promise<boolean> {
     }
 
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places,geometry,marker&loading=async`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(
+      apiKey
+    )}&libraries=places,geometry,visualization,marker&loading=async`;
     script.async = true;
     script.defer = true;
     script.onload = () => resolve(true);
@@ -162,6 +151,7 @@ function loadGoogleMapsSdk(apiKey: string): Promise<boolean> {
 }
 
 export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
+  showSurgeHeatmap = false,
   selectableMode = null,
   height = '100%',
 }) => {
@@ -181,7 +171,11 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
   const mapDomRef = useRef<HTMLDivElement>(null);
   const googleMapInstanceRef = useRef<google.maps.Map | null>(null);
   const trafficLayerRef = useRef<google.maps.TrafficLayer | null>(null);
+  const heatmapLayerRef = useRef<google.maps.visualization.HeatmapLayer | null>(null);
   const overlayRef = useRef<google.maps.OverlayView | null>(null);
+  const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
+
+  const [apiKey] = useState<string>(() => getGoogleMapsApiKey());
 
   const [isSdkLoaded, setIsSdkLoaded] = useState<boolean>(
     typeof window !== 'undefined' && !!(window.google && window.google.maps) && !(window as any).__googleMapsAuthFailed
@@ -196,22 +190,21 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
   const [showTraffic, setShowTraffic] = useState<boolean>(false);
   const [isCenteringGPS, setIsCenteringGPS] = useState<boolean>(false);
 
-  // Projection / Screen offset sync for markers
+  // Projection for screen offset sync
   const [overlayProjection, setOverlayProjection] = useState<google.maps.MapCanvasProjection | null>(null);
 
-  // Fallback Dragging & Panning state
+  // Fallback dragging & panning state
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const centerStartRef = useRef<{ lat: number; lng: number }>({ lat: 9.5600, lng: 44.0650 });
   const hasMovedRef = useRef(false);
 
-  // Dimensions
+  // Screen dimensions
   const [dimensions, setDimensions] = useState<{ width: number; height: number }>({
     width: typeof window !== 'undefined' ? window.innerWidth : 800,
     height: typeof window !== 'undefined' ? window.innerHeight : 600,
   });
 
-  // Keep dimensions responsive
   useEffect(() => {
     const updateSize = () => {
       if (containerRef.current) {
@@ -241,11 +234,11 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     return () => window.removeEventListener('gm_authFailure', handleAuthFailure);
   }, []);
 
-  // Only load SDK if a non-empty key is present
+  // Load Google Maps SDK
   useEffect(() => {
     let mounted = true;
-    if (GOOGLE_MAPS_KEY && !isSdkLoaded && !(window as any).__googleMapsAuthFailed) {
-      loadGoogleMapsSdk(GOOGLE_MAPS_KEY).then((loaded) => {
+    if (apiKey && !isSdkLoaded && !(window as any).__googleMapsAuthFailed) {
+      loadGoogleMapsSdk(apiKey).then((loaded) => {
         if (mounted && loaded && window.google && window.google.maps) {
           setIsSdkLoaded(true);
         }
@@ -254,7 +247,7 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     return () => {
       mounted = false;
     };
-  }, [isSdkLoaded]);
+  }, [apiKey, isSdkLoaded]);
 
   // Handle Location Click
   const handleLocationSelect = useCallback(
@@ -277,7 +270,7 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     [selectableMode, setDropoffLocation, setPickupLocation]
   );
 
-  // Initialize native Google Map when SDK is ready
+  // Initialize native Google Map
   useEffect(() => {
     if (!isSdkLoaded || !mapDomRef.current || googleMapInstanceRef.current) return;
 
@@ -296,38 +289,27 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
 
       const traffic = new google.maps.TrafficLayer();
       trafficLayerRef.current = traffic;
-      if (showTraffic) {
-        traffic.setMap(gMap);
-      }
+      if (showTraffic) traffic.setMap(gMap);
 
       gMap.addListener('center_changed', () => {
         const c = gMap.getCenter();
-        if (c) {
-          setCenter({ lat: c.lat(), lng: c.lng() });
-        }
+        if (c) setCenter({ lat: c.lat(), lng: c.lng() });
       });
 
       gMap.addListener('zoom_changed', () => {
         const z = gMap.getZoom();
-        if (z !== undefined) {
-          setZoom(z);
-        }
+        if (z !== undefined) setZoom(z);
       });
 
       gMap.addListener('click', (e: google.maps.MapMouseEvent) => {
-        if (e.latLng) {
-          handleLocationSelect(e.latLng.lat(), e.latLng.lng());
-        }
+        if (e.latLng) handleLocationSelect(e.latLng.lat(), e.latLng.lng());
       });
 
-      // OverlayView to get accurate projection for HTML vehicle markers
       const overlay = new google.maps.OverlayView();
       overlay.onAdd = function () {};
       overlay.draw = function () {
         const projection = overlay.getProjection();
-        if (projection) {
-          setOverlayProjection(projection);
-        }
+        if (projection) setOverlayProjection(projection);
       };
       overlay.onRemove = function () {};
       overlay.setMap(gMap);
@@ -337,7 +319,7 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     }
   }, [isSdkLoaded, handleLocationSelect]);
 
-  // Sync Map Options on change
+  // Sync Map Style Options
   useEffect(() => {
     const gMap = googleMapInstanceRef.current;
     if (!gMap) return;
@@ -366,6 +348,70 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     }
   }, [showTraffic]);
 
+  // Surge Demand Heatmap Layer using Google Maps Visualization
+  useEffect(() => {
+    const gMap = googleMapInstanceRef.current;
+    if (!gMap || !window.google?.maps?.visualization?.HeatmapLayer) return;
+
+    if (showSurgeHeatmap) {
+      if (!heatmapLayerRef.current) {
+        const hotPoints = [
+          new google.maps.LatLng(9.5620, 44.0645), // Suuqa Waaheen
+          new google.maps.LatLng(9.5615, 44.0682), // Dahabshiil
+          new google.maps.LatLng(9.5585, 44.0640), // Telesom
+          new google.maps.LatLng(9.5700, 44.0750), // Jigjiga Yar
+          new google.maps.LatLng(9.5822, 44.0450), // Mansoor
+          new google.maps.LatLng(9.5167, 44.0889), // Airport
+        ];
+        heatmapLayerRef.current = new google.maps.visualization.HeatmapLayer({
+          data: hotPoints,
+          radius: 35,
+          opacity: 0.7,
+        });
+      }
+      heatmapLayerRef.current.setMap(gMap);
+    } else if (heatmapLayerRef.current) {
+      heatmapLayerRef.current.setMap(null);
+    }
+  }, [showSurgeHeatmap]);
+
+  // Google Maps Directions Routing
+  useEffect(() => {
+    const gMap = googleMapInstanceRef.current;
+    if (!gMap || !pickupLocation || !dropoffLocation || !window.google?.maps) return;
+
+    if (!directionsRendererRef.current) {
+      directionsRendererRef.current = new google.maps.DirectionsRenderer({
+        map: gMap,
+        suppressMarkers: true, // We use custom vehicle and pickup/dropoff markers
+        polylineOptions: {
+          strokeColor: '#0066F5',
+          strokeOpacity: 0.9,
+          strokeWeight: 6,
+        },
+      });
+    }
+
+    const directionsService = new google.maps.DirectionsService();
+    directionsService.route(
+      {
+        origin: { lat: pickupLocation.lat, lng: pickupLocation.lng },
+        destination: { lat: dropoffLocation.lat, lng: dropoffLocation.lng },
+        travelMode: google.maps.TravelMode.DRIVING,
+      },
+      (result, status) => {
+        if (status === google.maps.DirectionsStatus.OK && result) {
+          directionsRendererRef.current?.setDirections(result);
+        }
+      }
+    );
+
+    return () => {
+      directionsRendererRef.current?.setMap(null);
+      directionsRendererRef.current = null;
+    };
+  }, [pickupLocation, dropoffLocation]);
+
   // Sync center and zoom into Google Map
   useEffect(() => {
     const gMap = googleMapInstanceRef.current;
@@ -388,7 +434,7 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     }
   }, [zoom]);
 
-  // Real-Time Hardware GPS Driver Telematics
+  // Real-Time Driver Pos
   const assignedDriver = currentRide?.assignedDriverId
     ? drivers.find((d) => d.id === currentRide.assignedDriverId)
     : undefined;
@@ -411,7 +457,6 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     return null;
   }, [role, driverGpsStatus, assignedDriver]);
 
-  // Update center when pickup location changes initially
   useEffect(() => {
     if (pickupLocation?.lat && pickupLocation?.lng) {
       setCenter({ lat: pickupLocation.lat, lng: pickupLocation.lng });
@@ -462,7 +507,7 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     }
   };
 
-  // Convert Lat/Lng to Container Screen Pixel coordinates
+  // Convert Lat/Lng to Screen Pixel coordinates
   const toScreenCoord = useCallback(
     (lat: number, lng: number) => {
       if (overlayProjection && window.google && googleMapInstanceRef.current) {
@@ -485,7 +530,7 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     [overlayProjection, center.lat, center.lng, zoom, dimensions.width, dimensions.height]
   );
 
-  // Real Road Route Path Points
+  // Fallback Route Path Points
   const routePoints = useMemo(() => {
     if (roadRoute?.coordinates && roadRoute.coordinates.length > 1) {
       return roadRoute.coordinates.map(([lng, lat]) => toScreenCoord(lat, lng));
@@ -493,7 +538,6 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     if (pickupLocation && dropoffLocation) {
       const p1 = toScreenCoord(pickupLocation.lat, pickupLocation.lng);
       const p2 = toScreenCoord(dropoffLocation.lat, dropoffLocation.lng);
-      // Smooth intermediate waypoint
       const midX = (p1.x + p2.x) / 2;
       const midY = (p1.y + p2.y) / 2;
       return [p1, { x: midX, y: midY }, p2];
@@ -501,7 +545,6 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     return [];
   }, [roadRoute?.coordinates, pickupLocation, dropoffLocation, toScreenCoord]);
 
-  // Smooth curved SVG path for the route
   const smoothRoutePath = useMemo(() => {
     if (routePoints.length < 2) return '';
     if (routePoints.length === 2) {
@@ -520,7 +563,6 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     return d;
   }, [routePoints]);
 
-  // Driver Approach Path computation
   const approachSvgPath = useMemo(() => {
     if (
       !liveDriverPos ||
@@ -534,7 +576,7 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     return `M ${pDriver.x},${pDriver.y} L ${pPickup.x},${pPickup.y}`;
   }, [liveDriverPos, pickupLocation, currentRide?.status, toScreenCoord]);
 
-  // Pre-calculate pure Google Map direct raster tiles for instant smooth rendering
+  // Raster Tiles Calculation
   const centerPixel = useMemo(
     () => latLngToPixel(center.lat, center.lng, zoom),
     [center.lat, center.lng, zoom]
@@ -557,36 +599,6 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     );
     return latLngToTile(br.lat, br.lng, zoom);
   }, [centerPixel.x, centerPixel.y, dimensions.width, dimensions.height, zoom]);
-
-  // Curated prominent landmarks and city places in Hargeisa for high visual clarity
-  const HARGEISA_NOTABLE_PLACES = useMemo(() => [
-    { id: 'place_airport', name: 'Cigaal Airport (Egal)', lat: 9.5167, lng: 44.0889, category: 'Airport', icon: '✈️' },
-    { id: 'place_mig', name: 'Taallada MiG (War Memorial)', lat: 9.5598, lng: 44.0673, category: 'Monument', icon: '🏛️' },
-    { id: 'place_suuq', name: 'Suuqa Waaheen (Central Market)', lat: 9.5620, lng: 44.0645, category: 'Market', icon: '🛍️' },
-    { id: 'place_dahabshiil', name: 'Dahabshiil HQ (26 June)', lat: 9.5615, lng: 44.0682, category: 'Finance', icon: '🏦' },
-    { id: 'place_telesom', name: 'Telesom HQ (Main Street)', lat: 9.5585, lng: 44.0640, category: 'Telecom', icon: '📱' },
-    { id: 'place_uoh', name: 'Jaamacadda Hargeysa (UoH)', lat: 9.5512, lng: 44.0585, category: 'University', icon: '🎓' },
-    { id: 'place_edna', name: 'Edna Adan Hospital', lat: 9.5543, lng: 44.0678, category: 'Hospital', icon: '🏥' },
-    { id: 'place_mansoor', name: 'Mansoor Hotel', lat: 9.5822, lng: 44.0450, category: 'Hotel', icon: '🏨' },
-    { id: 'place_ambassador', name: 'Ambassador Hotel', lat: 9.5255, lng: 44.0845, category: 'Hotel', icon: '🏨' },
-    { id: 'place_jigjigayar', name: 'Jigjiga Yar District', lat: 9.5700, lng: 44.0750, category: 'District', icon: '📍' },
-    { id: 'place_shacabka', name: "Bada Cas / Sha'abka", lat: 9.5570, lng: 44.0610, category: 'District', icon: '📍' },
-    { id: 'place_gollis', name: 'Gollis University', lat: 9.5630, lng: 44.0725, category: 'University', icon: '🎓' },
-    { id: 'place_national', name: 'National Museum & Daryeel', lat: 9.5590, lng: 44.0655, category: 'Culture', icon: '🏛️' },
-    { id: 'place_star', name: 'Star Hotel / Main Rd', lat: 9.5605, lng: 44.0665, category: 'Hotel', icon: '🏨' },
-    { id: 'place_oriental', name: 'Oriental Hotel Hargeisa', lat: 9.5612, lng: 44.0650, category: 'Hotel', icon: '🏨' },
-    { id: 'place_inaxaar', name: 'Ina Naxar Street', lat: 9.5645, lng: 44.0690, category: 'Street', icon: '📍' },
-    { id: 'place_maxamuud', name: 'Maxamuud Haybe Area', lat: 9.5480, lng: 44.0720, category: 'District', icon: '📍' },
-    { id: 'place_koodbuur', name: 'Ibrahim Koodbuur District', lat: 9.5750, lng: 44.0620, category: 'District', icon: '📍' },
-  ], []);
-
-  // Compute screen coordinates for visible Hargeisa city places
-  const visibleCityPlaces = useMemo(() => {
-    return HARGEISA_NOTABLE_PLACES.map((p) => {
-      const pt = toScreenCoord(p.lat, p.lng);
-      return { ...p, x: pt.x, y: pt.y };
-    }).filter((p) => p.x >= -60 && p.x <= dimensions.width + 60 && p.y >= -60 && p.y <= dimensions.height + 60);
-  }, [HARGEISA_NOTABLE_PLACES, toScreenCoord, dimensions.width, dimensions.height]);
 
   const fallbackGoogleTiles = useMemo(() => {
     const list: Array<{ x: number; y: number; left: number; top: number; key: string; url: string; fallbackUrl: string }> = [];
@@ -628,7 +640,7 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     return list;
   }, [zoom, minTile, maxTile, centerPixel, dimensions, mapLayer]);
 
-  // Touch and Mouse fallback interaction
+  // Drag & Mouse Handlers for raster mode
   const handleMouseDown = (e: React.MouseEvent) => {
     if (isSdkLoaded) return;
     isDraggingRef.current = true;
@@ -703,7 +715,7 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     }
   };
 
-  // Nearby drivers to render on map (filtered within viewport and deduplicated by id)
+  // Filter visible drivers with active status
   const visibleDrivers = useMemo(() => {
     const list = (drivers || []).filter((d) => {
       const lat = d.currentLocation?.lat ?? (d as any).lat;
@@ -735,14 +747,14 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
       onTouchEnd={handleTouchEnd}
       onWheel={handleWheel}
     >
-      {/* 1. Real Google Maps Native Container */}
+      {/* 1. Real Google Maps Native Canvas */}
       <div
         ref={mapDomRef}
         className="absolute inset-0 w-full h-full z-0"
         style={{ opacity: isSdkLoaded ? 1 : 0, transition: 'opacity 0.3s ease' }}
       />
 
-      {/* 2. High-Clarity Slippy Raster Tiles (Hargeisa, Somaliland) */}
+      {/* 2. Fallback Slippy Raster Tiles */}
       {!isSdkLoaded && (
         <div className="absolute inset-0 pointer-events-none z-0">
           {fallbackGoogleTiles.map((t) => (
@@ -766,19 +778,15 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
         </div>
       )}
 
-      {/* 3. Real SVG Route Corridor Layer */}
+      {/* 3. Real SVG Route Layer (used when native DirectionsRenderer is inactive) */}
       <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
         <defs>
-          <linearGradient id="routeGrad" x1="0%" y1="100%" x2="0%" y2="0%">
-            <stop offset="0%" stopColor="#0066F5" />
-            <stop offset="100%" stopColor="#00A86B" />
-          </linearGradient>
           <filter id="routeGlow" x="-20%" y="-20%" width="140%" height="140%">
             <feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="#0066F5" floodOpacity="0.35" />
           </filter>
         </defs>
 
-        {/* Approach Route (Driver to Pickup) */}
+        {/* Approach Route */}
         {approachSvgPath && (
           <path
             d={approachSvgPath}
@@ -791,8 +799,8 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
           />
         )}
 
-        {/* Trip Route Ribbon */}
-        {smoothRoutePath && (
+        {/* Fallback Trip Route Ribbon if native directions renderer unavailable */}
+        {!isSdkLoaded && smoothRoutePath && (
           <>
             <path
               d={smoothRoutePath}
@@ -825,28 +833,9 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
         )}
       </svg>
 
-      {/* 4. Real Interactive Markers Layer (Drivers, Pickup, Destination, City Places) */}
+      {/* 4. Real-Time Vehicle Markers & Pick/Drop Beacons */}
       <div className="absolute inset-0 pointer-events-none z-20">
-        {/* Prominent Hargeisa City Places & Landmarks */}
-        {visibleCityPlaces.map((p) => (
-          <div
-            key={p.id}
-            onClick={(e) => {
-              e.stopPropagation();
-              handleLocationSelect(p.lat, p.lng);
-            }}
-            className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-auto cursor-pointer group transition-all hover:scale-110 active:scale-95 z-20"
-            style={{ left: `${p.x}px`, top: `${p.y}px` }}
-            title={`${p.name} - Guji si aad u doorato goobtan`}
-          >
-            <div className="flex items-center space-x-1 px-2 py-0.5 rounded-full bg-white/95 dark:bg-slate-900/95 shadow-md border border-slate-200/90 dark:border-slate-700/90 backdrop-blur-xs text-[10px] font-bold text-slate-800 dark:text-slate-100 group-hover:bg-blue-50 group-hover:text-blue-700 group-hover:border-blue-300">
-              <span className="text-xs">{p.icon}</span>
-              <span className="truncate max-w-[120px]">{p.name.split(' (')[0]}</span>
-            </div>
-          </div>
-        ))}
-
-        {/* Nearby Active Wadaage Fleet Drivers in Hargeisa */}
+        {/* Nearby Active Wadaage Fleet Cars showing Status (Available / Busy) */}
         {visibleDrivers.map((driver, idx) => {
           const lat = driver.currentLocation?.lat ?? (driver as any).lat;
           const lng = driver.currentLocation?.lng ?? (driver as any).lng;
@@ -864,10 +853,9 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
                 color={driver.vehicle?.color || (driver as any).carColor || 'White'}
                 model={driver.vehicle?.model || (driver as any).carModel || 'Toyota Vitz'}
                 licensePlate={driver.vehicle?.licensePlate || (driver as any).licensePlate || 'SL-Taxi'}
-                driverName={driver.name}
                 heading={driver.currentHeading || 0}
                 isAssigned={isAssigned}
-                showDetails={isAssigned}
+                status={driver.status || (isAssigned ? 'busy' : 'available')}
                 size={isAssigned ? 'md' : 'sm'}
               />
             </div>
@@ -883,11 +871,8 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
               style={{ left: `${pt.x}px`, top: `${pt.y}px` }}
             >
               <div className="relative flex flex-col items-center select-none pb-1">
-                <div className="relative bg-[#0066F5] text-white text-[11px] font-extrabold px-3 py-1 rounded-xl shadow-xl whitespace-nowrap mb-1 border border-blue-400/40 after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-[4px] after:border-transparent after:border-t-[#0066F5]">
-                  <span>📍 {pickupLocation.name || 'Pickup Point'}</span>
-                </div>
-                <div className="w-5 h-5 rounded-full bg-[#0066F5] border-2 border-white shadow-lg flex items-center justify-center">
-                  <div className="w-2 h-2 rounded-full bg-white" />
+                <div className="w-6 h-6 rounded-full bg-[#0066F5] border-2 border-white shadow-xl flex items-center justify-center">
+                  <div className="w-2.5 h-2.5 rounded-full bg-white" />
                 </div>
               </div>
             </div>
@@ -902,10 +887,7 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
               className="absolute -translate-x-1/2 -translate-y-full pointer-events-none animate-in fade-in zoom-in-95 duration-200 z-30"
               style={{ left: `${pt.x}px`, top: `${pt.y}px` }}
             >
-              <div className="relative flex flex-col items-center pb-1">
-                <div className="px-3 py-1 bg-slate-900/95 border border-emerald-400 text-emerald-300 text-[11px] font-black rounded-xl shadow-xl mb-1 whitespace-nowrap">
-                  <span>🏁 {dropoffLocation.name || 'Destination'}</span>
-                </div>
+              <div className="relative flex flex-col items-center pb-1 select-none">
                 <div className="w-7 h-7 rounded-full bg-[#094757] border-2 border-[#00E575] flex items-center justify-center text-[#00E575] shadow-xl">
                   <MapPin className="w-4 h-4 fill-current" />
                 </div>
@@ -915,9 +897,9 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
         })()}
       </div>
 
-      {/* 5. Clean Modern Floating Map Controls */}
+      {/* 5. Modern Floating Map Controls */}
       <div className="absolute right-3.5 bottom-24 z-30 pointer-events-auto flex flex-col space-y-2">
-        {/* Fit Bounds / Overview */}
+        {/* Fit Bounds */}
         <button
           type="button"
           onClick={handleFitBounds}
@@ -950,7 +932,7 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
           <Layers className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
         </button>
 
-        {/* Zoom In & Out */}
+        {/* Zoom Controls */}
         <div className="flex flex-col bg-white/95 dark:bg-slate-900/95 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
           <button
             type="button"
