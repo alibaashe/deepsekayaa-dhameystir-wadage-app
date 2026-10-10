@@ -507,3 +507,103 @@ export function isPhoneMatch(phoneA: string | undefined | null, phoneB: string |
   return false;
 }
 
+/**
+ * Strict validator for Somaliland Rider phone numbers:
+ * Must be EXACTLY 9 digits, starting with 63 (Telesom ZAAD) or 65 (Somtel EDAHAB).
+ */
+export function isValidSomalilandRiderPhone(phone: string | undefined | null): boolean {
+  const normalized = normalizeSomalilandPhone(phone);
+  return normalized.length === 9 && (normalized.startsWith('63') || normalized.startsWith('65'));
+}
+
+/**
+ * Returns the telecom operator name for a Somaliland phone number
+ */
+export function getPhoneOperator(phone: string | undefined | null): 'Telesom' | 'Somtel' | null {
+  const normalized = normalizeSomalilandPhone(phone);
+  if (normalized.startsWith('63')) return 'Telesom';
+  if (normalized.startsWith('65')) return 'Somtel';
+  return null;
+}
+
+/**
+ * Formats a 9-digit Somaliland phone number nicely as +252 XX XXXXXXX
+ */
+export function formatSomalilandPhone(phone: string | undefined | null): string {
+  const normalized = normalizeSomalilandPhone(phone);
+  if (normalized.length === 9) {
+    return `+252 ${normalized.substring(0, 2)} ${normalized.substring(2)}`;
+  }
+  return normalized ? `+252 ${normalized}` : '';
+}
+
+/**
+ * Looks up any registered rider in local storage and memory by phone number
+ */
+export function findRegisteredRider(inputPhone: string | undefined | null): any | null {
+  if (!inputPhone) return null;
+  const cleanTarget = normalizeSomalilandPhone(inputPhone);
+  if (!cleanTarget || cleanTarget.length < 7) return null;
+
+  try {
+    const deletedIds = (() => {
+      try {
+        const raw = localStorage.getItem('wadaage_deleted_user_ids');
+        return raw ? new Set(JSON.parse(raw)) : new Set();
+      } catch {
+        return new Set();
+      }
+    })();
+
+    const registeredUsers = secureStorage.getItem<any[]>('wadaage_registered_users', []) || [];
+    const localRegUsers = (() => {
+      try {
+        const raw = localStorage.getItem('wadaage_registered_users');
+        return raw ? JSON.parse(raw) : [];
+      } catch {
+        return [];
+      }
+    })();
+    const adminUsers = (() => {
+      try {
+        const raw = localStorage.getItem('wadaage_user_management_records');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            return parsed
+              .filter((p: any) => p.role === 'Passenger' || p.role === 'passenger')
+              .map((p: any) => ({
+                id: p.id,
+                name: p.name,
+                email: p.email,
+                phone: p.phone,
+                password: p.password,
+                role: 'passenger',
+              }));
+          }
+        }
+      } catch {}
+      return [];
+    })();
+
+    const fallbackRiders = [
+      { id: 'usr_default_1', name: 'Faadumo Jaamac', phone: '634918201', role: 'passenger' },
+      { id: 'usr_default_2', name: 'Cabdi Nuur', phone: '654918201', role: 'passenger' },
+    ];
+
+    const allRiders = [...adminUsers, ...localRegUsers, ...registeredUsers, ...fallbackRiders];
+
+    return (
+      allRiders.find((u) => {
+        if (!u || !u.phone) return false;
+        const isRiderRole = u.role === 'passenger' || (!u.role && !('vehicle' in u) && !('vehicleCategory' in u));
+        if (!isRiderRole) return false;
+        if (deletedIds.has(u.id) || (u.phone && deletedIds.has(u.phone))) return false;
+        return isPhoneMatch(u.phone, cleanTarget);
+      }) || null
+    );
+  } catch {
+    return null;
+  }
+}
+

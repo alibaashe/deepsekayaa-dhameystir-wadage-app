@@ -29,7 +29,15 @@ import { SecurityEncryptionCenter } from './SecurityEncryptionCenter';
 import { WebsiteCmsManager } from './WebsiteCmsManager';
 
 export const AdminDashboard: React.FC = () => {
-  const { drivers, currentRide, pricing, dispatchDriverToRide, driverWalletTransactions } = useRide();
+  const {
+    drivers,
+    currentRide,
+    pricing,
+    dispatchDriverToRide,
+    driverWalletTransactions,
+    getDispatchRadiusKm,
+    setDispatchRadius,
+  } = useRide();
   const [activeTab, setActiveTab] = useState<
     'dispatch' | 'flow_matching' | 'pricing' | 'approval' | 'topup' | 'users' | 'broadcast' | 'coupons' | 'roles' | 'payments' | 'whatsapp' | 'security' | 'hostinger' | 'database' | 'playstore' | 'website_cms'
   >('dispatch');
@@ -437,6 +445,151 @@ export const AdminDashboard: React.FC = () => {
             >
               Surge Heatmap: {showSurgeHeatmap ? 'ON' : 'OFF'}
             </button>
+          </div>
+
+          {/* Driver Dispatch Search Radius & Fleet Matching Control Center */}
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-md space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center font-bold">
+                  <Sliders className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">
+                    Driver Dispatch Search Radius Control
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    Control the strict GPS search radius for Normal Taxi & Wadaage Share orders
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDispatchRadius('both', 1.5)}
+                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold text-xs shadow-md transition active:scale-95 flex items-center gap-1.5 cursor-pointer"
+              >
+                <Zap className="w-3.5 h-3.5" />
+                <span>Command 1.5 KM for Both Services</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              {/* Normal Taxi Radius Control */}
+              {(() => {
+                const taxiRadius = getDispatchRadiusKm('wadaage_taxi');
+                return (
+                  <div className="bg-slate-50 dark:bg-slate-800/80 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700/80 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Car className="w-4 h-4 text-blue-500" />
+                        <span className="font-bold text-slate-900 dark:text-white">Normal Taxi Dispatch Radius</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          min="0.1"
+                          max="20"
+                          step="0.1"
+                          value={taxiRadius}
+                          onChange={(e) => setDispatchRadius('wadaage_taxi', parseFloat(e.target.value) || 1.5)}
+                          className="w-14 bg-white dark:bg-slate-900 border border-blue-400 rounded px-1.5 py-0.5 text-right font-mono font-black text-blue-600 dark:text-blue-400 text-xs focus:outline-none"
+                        />
+                        <span className="text-blue-600 dark:text-blue-400 font-mono font-bold text-xs">KM</span>
+                      </div>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.5"
+                      max="10"
+                      step="0.1"
+                      value={taxiRadius}
+                      onChange={(e) => setDispatchRadius('wadaage_taxi', parseFloat(e.target.value) || 1.5)}
+                      className="w-full accent-blue-500 cursor-pointer"
+                    />
+                    <div className="flex flex-wrap gap-1">
+                      {[0.8, 1.0, 1.5, 2.0, 3.0, 5.0].map((r) => (
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => setDispatchRadius('wadaage_taxi', r)}
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition ${
+                            taxiRadius === r
+                              ? 'bg-blue-600 text-white border-blue-500 shadow-sm ring-1 ring-blue-400'
+                              : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          {r === 1.5 ? '🎯 1.5 KM (Commanded)' : `${r} KM`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Wadaage Share Radius Control */}
+              {(() => {
+                const shareRadius = getDispatchRadiusKm('wadaage_share');
+                return (
+                  <div className="bg-slate-50 dark:bg-slate-800/80 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700/80 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Users className="w-4 h-4 text-emerald-500" />
+                        <span className="font-bold text-slate-900 dark:text-white">Wadaage Share Dispatch Radius</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          min="0.1"
+                          max="20"
+                          step="0.1"
+                          value={shareRadius}
+                          onChange={(e) => setDispatchRadius('wadaage_share', parseFloat(e.target.value) || 1.5)}
+                          className="w-14 bg-white dark:bg-slate-900 border border-emerald-400 rounded px-1.5 py-0.5 text-right font-mono font-black text-emerald-600 dark:text-emerald-400 text-xs focus:outline-none"
+                        />
+                        <span className="text-emerald-600 dark:text-emerald-400 font-mono font-bold text-xs">KM</span>
+                      </div>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.5"
+                      max="10"
+                      step="0.1"
+                      value={shareRadius}
+                      onChange={(e) => setDispatchRadius('wadaage_share', parseFloat(e.target.value) || 1.5)}
+                      className="w-full accent-emerald-500 cursor-pointer"
+                    />
+                    <div className="flex flex-wrap gap-1">
+                      {[0.8, 1.0, 1.5, 2.0, 3.0, 5.0].map((r) => (
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => setDispatchRadius('wadaage_share', r)}
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition ${
+                            shareRadius === r
+                              ? 'bg-emerald-600 text-white border-emerald-500 shadow-sm ring-1 ring-emerald-400'
+                              : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          {r === 1.5 ? '🎯 1.5 KM (Commanded)' : `${r} KM`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60 text-[11px] text-blue-800 dark:text-blue-200 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <span>🛡️</span>
+                <span>
+                  <b>Strict GPS Dispatching:</b> Only drivers within configured radius of passenger pickup will receive incoming orders.
+                </span>
+              </span>
+              <span className="font-mono font-black text-xs text-blue-600 dark:text-blue-300">
+                Taxi: {getDispatchRadiusKm('wadaage_taxi')} KM • Share: {getDispatchRadiusKm('wadaage_share')} KM
+              </span>
+            </div>
           </div>
 
           <div className="h-[420px] rounded-2xl overflow-hidden shadow-lg border border-slate-200 dark:border-slate-800">

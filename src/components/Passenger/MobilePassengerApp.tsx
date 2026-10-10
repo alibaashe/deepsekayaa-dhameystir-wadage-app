@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ArrowRightLeft,
   Car,
@@ -90,13 +90,22 @@ export const MobilePassengerApp: React.FC = () => {
     roadRouteSummary,
     isCalculatingRoadRoute,
     allPlatformRides,
+    seatsBooked,
+    setSeatsBooked,
   } = useRide();
 
   // Navigation Tabs: 'dalbo' (Home) | 'safarradayda' (My Rides) | 'wallet' (Wallet) | 'akoonka' (Account) | 'favorites'
   type TabType = 'dalbo' | 'safarradayda' | 'wallet' | 'akoonka' | 'favorites';
   const [activeTab, setActiveTab] = useState<TabType>('dalbo');
-  const [selectedCapacity, setSelectedCapacity] = useState<number>(1);
+  const [selectedCapacity, setSelectedCapacity] = useState<number>(() => seatsBooked || 1);
   const [capacityDropdownOpen, setCapacityDropdownOpen] = useState<boolean>(false);
+
+  // Sync seatsBooked from context when changed externally
+  useEffect(() => {
+    if (seatsBooked && seatsBooked !== selectedCapacity) {
+      setSelectedCapacity(seatsBooked);
+    }
+  }, [seatsBooked]);
 
   // Modals & Drawers
   const [showLocationSearchModal, setShowLocationSearchModal] = useState<'pickup' | 'dropoff' | null>(null);
@@ -161,7 +170,7 @@ export const MobilePassengerApp: React.FC = () => {
   );
 
   // Real fares formatted for Somaliland Shillings (9,000 SLSH 1st km + 4,000 SLSH/km for Share; 12,000 SLSH 1st km + 7,000 SLSH/km for Taxi)
-  const wadaageFare = computeFare('wadaage_share', distanceKm, durationMins, pricing);
+  const wadaageFare = computeFare('wadaage_share', distanceKm, durationMins, pricing, selectedCapacity);
   const taxiFare = computeFare('wadaage_taxi', distanceKm, durationMins, pricing);
 
   const formatSlshAmount = (usdFare: number) => {
@@ -612,6 +621,7 @@ export const MobilePassengerApp: React.FC = () => {
                                 type="button"
                                 onClick={() => {
                                   setSelectedCapacity(num);
+                                  setSeatsBooked(num);
                                   setCapacityDropdownOpen(false);
                                 }}
                                 className={`w-6 h-6 rounded-lg text-xs font-black flex items-center justify-center transition cursor-pointer ${

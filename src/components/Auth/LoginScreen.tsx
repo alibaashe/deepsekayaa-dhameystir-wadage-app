@@ -448,29 +448,20 @@ export const LoginScreen: React.FC = () => {
     }
 
     const cleanPhone = getCleanPhoneDigits();
-    if (!cleanPhone || cleanPhone.length < 7) {
-      setFormError(
-        language === 'so'
-          ? 'Fadlan geli lambar taleefan oo sax ah (Ku bilow 63 ama 65, tusaale: 63 7123456)'
-          : 'Please enter a valid phone number (Start with 63 or 65, e.g. 63 7123456)'
-      );
-      return;
-    }
-
-    if (!cleanPhone.startsWith('63') && !cleanPhone.startsWith('65')) {
-      if (cleanPhone.length === 7) {
+    if (!cleanPhone || cleanPhone.length !== 9 || (!cleanPhone.startsWith('63') && !cleanPhone.startsWith('65'))) {
+      if (!cleanPhone || (!cleanPhone.startsWith('63') && !cleanPhone.startsWith('65'))) {
         setFormError(
           language === 'so'
-            ? `Fadlan lambarka ku bilow 63 ama 65 (tusaale: 63${cleanPhone} ama 65${cleanPhone})`
-            : `Please prepend 63 or 65 to your 7-digit number (e.g. 63${cleanPhone} or 65${cleanPhone})`
+            ? 'Lambarka taleefanku waa inuu ku bilaabmaa 63 (Telesom ZAAD) ama 65 (Somtel EDAHAB)'
+            : 'Phone number must start with 63 (Telesom) or 65 (Somtel)'
         );
-        return;
+      } else {
+        setFormError(
+          language === 'so'
+            ? `Lambarka taleefanku waa inuu noqdaa 9 lambar oo keliya (hadda waa ${cleanPhone.length} lambar). Tusaale: 63 4918201 ama 65 4918201`
+            : `Phone number must be exactly 9 digits (currently ${cleanPhone.length} digits). Example: 63 4918201 or 65 4918201`
+        );
       }
-      setFormError(
-        language === 'so'
-          ? 'Lambarka taleefanku waa inuu ku bilaabmaa 63 (Telesom) ama 65 (Somtel)'
-          : 'Phone number must start with 63 (Telesom) or 65 (Somtel)'
-      );
       return;
     }
 
@@ -1252,6 +1243,7 @@ export const LoginScreen: React.FC = () => {
                   <div className="flex-1 relative">
                     <input
                       type="tel"
+                      maxLength={9}
                       value={phoneNumber}
                       onChange={handlePhoneInputChange}
                       placeholder="63 4918201 ama 65..."
@@ -1260,28 +1252,53 @@ export const LoginScreen: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Sub-label showing guidance */}
+                {/* Sub-label showing guidance and digit counter */}
                 <div className="flex items-center justify-between text-[10px] mt-1.5 px-1 font-medium">
-                  <span className="text-white/60">
-                    {language === 'so'
-                      ? 'Ku bilow 63 ama 65'
-                      : 'Continue with 63 or 65'}
+                  <div className="flex items-center gap-1.5">
+                    {phoneNumber.startsWith('63') && (
+                      <span className="text-[#00E575] font-bold flex items-center space-x-1">
+                        <CheckCircle2 className="w-3 h-3 inline" /> <span>63 (Telesom ZAAD)</span>
+                      </span>
+                    )}
+                    {phoneNumber.startsWith('65') && (
+                      <span className="text-cyan-400 font-bold flex items-center space-x-1">
+                        <CheckCircle2 className="w-3 h-3 inline" /> <span>65 (Somtel EDAHAB)</span>
+                      </span>
+                    )}
+                    {!phoneNumber.startsWith('63') && !phoneNumber.startsWith('65') && (
+                      <span className="text-amber-400/90 font-mono text-[9px]">
+                        Ku bilow 63 ama 65
+                      </span>
+                    )}
+                  </div>
+                  <span className="font-mono font-bold text-[#00E575] bg-[#002418] px-2 py-0.5 rounded-full border border-[#00E575]/30">
+                    {phoneNumber.length}/9 lambar
                   </span>
-                  {phoneNumber.startsWith('63') && (
-                    <span className="text-[#00E575] font-bold flex items-center space-x-1">
-                      <CheckCircle2 className="w-3 h-3 inline" /> <span>63 (Telesom)</span>
-                    </span>
-                  )}
-                  {phoneNumber.startsWith('65') && (
-                    <span className="text-cyan-400 font-bold flex items-center space-x-1">
-                      <CheckCircle2 className="w-3 h-3 inline" /> <span>65 (Somtel)</span>
-                    </span>
-                  )}
-                  {!phoneNumber.startsWith('63') && !phoneNumber.startsWith('65') && (
-                    <span className="text-amber-400/90 font-mono text-[9px]">
-                      Tusaale: 63 6807814 ama 65 4918201
-                    </span>
-                  )}
+                </div>
+
+                {/* Quick sample chips */}
+                <div className="flex items-center gap-2 mt-1.5 px-1">
+                  <span className="text-[10px] text-white/50">Tusaale:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPhoneNumber('634918201');
+                      if (formError) setFormError(null);
+                    }}
+                    className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-[#002418] hover:bg-[#003824] text-[#00E575] border border-[#00E575]/30 transition"
+                  >
+                    63 4918201
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPhoneNumber('654918201');
+                      if (formError) setFormError(null);
+                    }}
+                    className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-[#002418] hover:bg-[#003824] text-cyan-400 border border-cyan-500/30 transition"
+                  >
+                    65 4918201
+                  </button>
                 </div>
               </div>
             </>

@@ -801,13 +801,27 @@ export const RideBookingCard: React.FC<RideBookingCardProps> = ({
                 onChange={(e) => setRecipientName(e.target.value)}
                 className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-2 font-semibold text-slate-900 dark:text-white outline-none focus:border-amber-500"
               />
-              <input
-                type="text"
-                placeholder="Phone (e.g. +252 63 4110022)"
-                value={recipientPhone}
-                onChange={(e) => setRecipientPhone(e.target.value)}
-                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-2 font-semibold text-slate-900 dark:text-white outline-none focus:border-amber-500"
-              />
+              <div className="relative">
+                <input
+                  type="tel"
+                  maxLength={9}
+                  placeholder="Recipient Phone (63/65 - 9 digits)"
+                  value={recipientPhone}
+                  onChange={(e) => {
+                    let clean = e.target.value.replace(/\D/g, '');
+                    if (clean.startsWith('00252')) clean = clean.substring(5);
+                    else if (clean.startsWith('252')) clean = clean.substring(3);
+                    if (clean.startsWith('0')) clean = clean.substring(1);
+                    setRecipientPhone(clean.substring(0, 9));
+                  }}
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-2 font-mono font-semibold text-slate-900 dark:text-white outline-none focus:border-amber-500 text-xs"
+                />
+                {recipientPhone.length > 0 && (
+                  <span className="absolute right-2 top-2 text-[10px] font-mono text-slate-400">
+                    {recipientPhone.length}/9
+                  </span>
+                )}
+              </div>
             </div>
           )}
 

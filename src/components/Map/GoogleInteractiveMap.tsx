@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useRide } from '../../context/RideContext';
 import { findNearestHargeisaPlace } from '../../utils/geo';
+import { HARGEISA_VERIFIED_LANDMARKS } from '../../data/hargeisaKeyLandmarks';
 import { RealisticVehicleMarker } from './RealisticVehicleMarker';
 
 interface GoogleInteractiveMapProps {
@@ -557,34 +558,70 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     return latLngToTile(br.lat, br.lng, zoom);
   }, [centerPixel.x, centerPixel.y, dimensions.width, dimensions.height, zoom]);
 
-  const fallbackGoogleTiles = useMemo(() => {
-    const list: Array<{ x: number; y: number; left: number; top: number; key: string; url: string }> = [];
-    const tileStartX = Math.max(0, minTile.x - 2);
-    const tileEndX = maxTile.x + 2;
-    const tileStartY = Math.max(0, maxTile.y - 2);
-    const tileEndY = minTile.y + 2;
+  // Curated prominent landmarks and city places in Hargeisa for high visual clarity
+  const HARGEISA_NOTABLE_PLACES = useMemo(() => [
+    { id: 'place_airport', name: 'Cigaal Airport (Egal)', lat: 9.5167, lng: 44.0889, category: 'Airport', icon: '✈️' },
+    { id: 'place_mig', name: 'Taallada MiG (War Memorial)', lat: 9.5598, lng: 44.0673, category: 'Monument', icon: '🏛️' },
+    { id: 'place_suuq', name: 'Suuqa Waaheen (Central Market)', lat: 9.5620, lng: 44.0645, category: 'Market', icon: '🛍️' },
+    { id: 'place_dahabshiil', name: 'Dahabshiil HQ (26 June)', lat: 9.5615, lng: 44.0682, category: 'Finance', icon: '🏦' },
+    { id: 'place_telesom', name: 'Telesom HQ (Main Street)', lat: 9.5585, lng: 44.0640, category: 'Telecom', icon: '📱' },
+    { id: 'place_uoh', name: 'Jaamacadda Hargeysa (UoH)', lat: 9.5512, lng: 44.0585, category: 'University', icon: '🎓' },
+    { id: 'place_edna', name: 'Edna Adan Hospital', lat: 9.5543, lng: 44.0678, category: 'Hospital', icon: '🏥' },
+    { id: 'place_mansoor', name: 'Mansoor Hotel', lat: 9.5822, lng: 44.0450, category: 'Hotel', icon: '🏨' },
+    { id: 'place_ambassador', name: 'Ambassador Hotel', lat: 9.5255, lng: 44.0845, category: 'Hotel', icon: '🏨' },
+    { id: 'place_jigjigayar', name: 'Jigjiga Yar District', lat: 9.5700, lng: 44.0750, category: 'District', icon: '📍' },
+    { id: 'place_shacabka', name: "Bada Cas / Sha'abka", lat: 9.5570, lng: 44.0610, category: 'District', icon: '📍' },
+    { id: 'place_gollis', name: 'Gollis University', lat: 9.5630, lng: 44.0725, category: 'University', icon: '🎓' },
+    { id: 'place_national', name: 'National Museum & Daryeel', lat: 9.5590, lng: 44.0655, category: 'Culture', icon: '🏛️' },
+    { id: 'place_star', name: 'Star Hotel / Main Rd', lat: 9.5605, lng: 44.0665, category: 'Hotel', icon: '🏨' },
+    { id: 'place_oriental', name: 'Oriental Hotel Hargeisa', lat: 9.5612, lng: 44.0650, category: 'Hotel', icon: '🏨' },
+    { id: 'place_inaxaar', name: 'Ina Naxar Street', lat: 9.5645, lng: 44.0690, category: 'Street', icon: '📍' },
+    { id: 'place_maxamuud', name: 'Maxamuud Haybe Area', lat: 9.5480, lng: 44.0720, category: 'District', icon: '📍' },
+    { id: 'place_koodbuur', name: 'Ibrahim Koodbuur District', lat: 9.5750, lng: 44.0620, category: 'District', icon: '📍' },
+  ], []);
 
-    for (let tx = tileStartX; tx <= tileEndX; tx++) {
-      for (let ty = tileStartY; ty <= tileEndY; ty++) {
+  // Compute screen coordinates for visible Hargeisa city places
+  const visibleCityPlaces = useMemo(() => {
+    return HARGEISA_NOTABLE_PLACES.map((p) => {
+      const pt = toScreenCoord(p.lat, p.lng);
+      return { ...p, x: pt.x, y: pt.y };
+    }).filter((p) => p.x >= -60 && p.x <= dimensions.width + 60 && p.y >= -60 && p.y <= dimensions.height + 60);
+  }, [HARGEISA_NOTABLE_PLACES, toScreenCoord, dimensions.width, dimensions.height]);
+
+  const fallbackGoogleTiles = useMemo(() => {
+    const list: Array<{ x: number; y: number; left: number; top: number; key: string; url: string; fallbackUrl: string }> = [];
+    const minX = Math.max(0, Math.min(minTile.x, maxTile.x) - 1);
+    const maxX = Math.max(minTile.x, maxTile.x) + 1;
+    const minY = Math.max(0, Math.min(minTile.y, maxTile.y) - 1);
+    const maxY = Math.max(minTile.y, maxTile.y) + 1;
+
+    const subdomains = ['a', 'b', 'c', 'd'];
+
+    for (let tx = minX; tx <= maxX; tx++) {
+      for (let ty = minY; ty <= maxY; ty++) {
         const tilePixelX = tx * 256;
         const tilePixelY = ty * 256;
         const screenX = tilePixelX - centerPixel.x + dimensions.width / 2;
         const screenY = tilePixelY - centerPixel.y + dimensions.height / 2;
 
-        let url = `https://mt1.google.com/vt/lyrs=m&x=${tx}&y=${ty}&z=${zoom}&hl=en`;
+        const sub = subdomains[Math.abs(tx + ty) % subdomains.length];
+        let url = `https://${sub}.basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${tx}/${ty}.png`;
         if (mapLayer === 'satellite') {
-          url = `https://mt1.google.com/vt/lyrs=y&x=${tx}&y=${ty}&z=${zoom}&hl=en`;
+          url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${ty}/${tx}`;
         } else if (mapLayer === 'dark') {
-          url = `https://mt1.google.com/vt/lyrs=m&x=${tx}&y=${ty}&z=${zoom}&hl=en`;
+          url = `https://${sub}.basemaps.cartocdn.com/dark_all/${zoom}/${tx}/${ty}.png`;
         }
+
+        const fallbackUrl = `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`;
 
         list.push({
           x: tx,
           y: ty,
           left: screenX,
           top: screenY,
-          key: `google_${mapLayer}_${zoom}_${tx}_${ty}`,
+          key: `map_${mapLayer}_${zoom}_${tx}_${ty}`,
           url,
+          fallbackUrl,
         });
       }
     }
@@ -666,13 +703,19 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     }
   };
 
-  // Nearby drivers to render on map (filtered within viewport)
+  // Nearby drivers to render on map (filtered within viewport and deduplicated by id)
   const visibleDrivers = useMemo(() => {
-    return (drivers || []).filter((d) => {
+    const list = (drivers || []).filter((d) => {
       const lat = d.currentLocation?.lat ?? (d as any).lat;
       const lng = d.currentLocation?.lng ?? (d as any).lng;
       if (!lat || !lng) return false;
       return d.status !== 'offline';
+    });
+    const seen = new Set<string>();
+    return list.filter((d) => {
+      if (seen.has(d.id)) return false;
+      seen.add(d.id);
+      return true;
     });
   }, [drivers]);
 
@@ -699,15 +742,20 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
         style={{ opacity: isSdkLoaded ? 1 : 0, transition: 'opacity 0.3s ease' }}
       />
 
-      {/* 2. Pure Google Maps Fallback Raster Tiles */}
+      {/* 2. High-Clarity Slippy Raster Tiles (Hargeisa, Somaliland) */}
       {!isSdkLoaded && (
         <div className="absolute inset-0 pointer-events-none z-0">
           {fallbackGoogleTiles.map((t) => (
             <img
               key={t.key}
               src={t.url}
-              alt="google-map-tile"
+              alt="hargeisa-map-tile"
               loading="eager"
+              onError={(e) => {
+                if (t.fallbackUrl && e.currentTarget.src !== t.fallbackUrl) {
+                  e.currentTarget.src = t.fallbackUrl;
+                }
+              }}
               className="absolute w-[256px] h-[256px] select-none pointer-events-none"
               style={{
                 left: `${t.left}px`,
@@ -777,10 +825,29 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
         )}
       </svg>
 
-      {/* 4. Real Interactive Markers Layer (Drivers, Pickup, Destination) */}
+      {/* 4. Real Interactive Markers Layer (Drivers, Pickup, Destination, City Places) */}
       <div className="absolute inset-0 pointer-events-none z-20">
+        {/* Prominent Hargeisa City Places & Landmarks */}
+        {visibleCityPlaces.map((p) => (
+          <div
+            key={p.id}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleLocationSelect(p.lat, p.lng);
+            }}
+            className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-auto cursor-pointer group transition-all hover:scale-110 active:scale-95 z-20"
+            style={{ left: `${p.x}px`, top: `${p.y}px` }}
+            title={`${p.name} - Guji si aad u doorato goobtan`}
+          >
+            <div className="flex items-center space-x-1 px-2 py-0.5 rounded-full bg-white/95 dark:bg-slate-900/95 shadow-md border border-slate-200/90 dark:border-slate-700/90 backdrop-blur-xs text-[10px] font-bold text-slate-800 dark:text-slate-100 group-hover:bg-blue-50 group-hover:text-blue-700 group-hover:border-blue-300">
+              <span className="text-xs">{p.icon}</span>
+              <span className="truncate max-w-[120px]">{p.name.split(' (')[0]}</span>
+            </div>
+          </div>
+        ))}
+
         {/* Nearby Active Wadaage Fleet Drivers in Hargeisa */}
-        {visibleDrivers.map((driver) => {
+        {visibleDrivers.map((driver, idx) => {
           const lat = driver.currentLocation?.lat ?? (driver as any).lat;
           const lng = driver.currentLocation?.lng ?? (driver as any).lng;
           if (!lat || !lng) return null;
@@ -789,7 +856,7 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
 
           return (
             <div
-              key={driver.id}
+              key={`drv_${driver.id}_${idx}`}
               className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-all duration-300 ease-out z-25"
               style={{ left: `${pt.x}px`, top: `${pt.y}px` }}
             >

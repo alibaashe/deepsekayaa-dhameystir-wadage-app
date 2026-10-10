@@ -8,6 +8,7 @@ import {
   Shield,
   Clock,
   CheckCircle,
+  CheckCircle2,
   AlertCircle,
   Bell,
   Sparkles,
@@ -30,6 +31,13 @@ import {
 } from './RiderAuthGraphics';
 import { sendWhatsAppOtp, verifyWhatsAppOtp, displayFormattedPhone } from '../../services/whatsappOtpService';
 import { HARGEISA_VERIFIED_LANDMARKS } from '../../data/hargeisaKeyLandmarks';
+import {
+  normalizeSomalilandPhone,
+  isValidSomalilandRiderPhone,
+  formatSomalilandPhone,
+  getPhoneOperator,
+  findRegisteredRider,
+} from '../../utils/security';
 
 // Popular Hargeisa districts and neighborhoods for quick pickup selection
 const POPULAR_HARGEISA_LOCATIONS = [
@@ -92,6 +100,7 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [createdUser, setCreatedUser] = useState<any>(null);
+  const [pendingLoginUser, setPendingLoginUser] = useState<any | null>(null);
 
   // Timers ticker
   useEffect(() => {
@@ -107,21 +116,31 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
     };
   }, [step]);
 
-  // Clean Somaliland digits
+  // Strict Somaliland phone sanitization: only digits, strip 00252/252/0, cap at exactly 9 numbers
+  const handlePhoneInputChange = (raw: string) => {
+    let clean = raw.replace(/\D/g, '');
+    if (clean.startsWith('00252')) clean = clean.substring(5);
+    else if (clean.startsWith('252')) clean = clean.substring(3);
+    if (clean.startsWith('0')) clean = clean.substring(1);
+    const capped = clean.substring(0, 9);
+    setPhoneInput(capped);
+    if (errorMessage) setErrorMessage(null);
+  };
+
   const getCleanPhoneDigits = (raw: string) => {
     let clean = raw.replace(/\D/g, '');
     if (clean.startsWith('00252')) clean = clean.substring(5);
     else if (clean.startsWith('252')) clean = clean.substring(3);
-    else if (clean.startsWith('0')) clean = clean.substring(1);
-    return clean;
+    if (clean.startsWith('0')) clean = clean.substring(1);
+    return clean.substring(0, 9);
   };
 
   const getFormattedPhone = () => {
     const clean = getCleanPhoneDigits(phoneInput);
-    if (clean.length >= 2) {
+    if (clean.length === 9) {
       return `+252 ${clean.substring(0, 2)} ${clean.substring(2)}`;
     }
-    return `+252 ${clean}`;
+    return clean ? `+252 ${clean}` : '';
   };
 
   // Handlers for OTP Inputs
@@ -170,29 +189,35 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
     setErrorMessage(null);
 
     const clean = getCleanPhoneDigits(phoneInput);
-    if (!clean || clean.length < 7) {
+    // Strict requirement: MUST be exactly 9 numbers starting with 63 or 65
+    if (clean.length !== 9 || (!clean.startsWith('63') && !clean.startsWith('65'))) {
+      if (!clean.startsWith('63') && !clean.startsWith('65')) {
+        setErrorMessage(
+          language === 'so'
+            ? 'Lambarka taleefanku waa inuu ku bilaabmaa 63 (Telesom ZAAD) ama 65 (Somtel EDAHAB)'
+            : 'Phone number must start with 63 (Telesom) or 65 (Somtel)'
+        );
+      } else {
+        setErrorMessage(
+          language === 'so'
+            ? `Lambarka taleefanku waa inuu noqdaa 9 lambar oo keliya (hadda waa ${clean.length} lambar). Tusaale: 63 4918201 ama 65 4918201`
+            : `Rider phone number must be exactly 9 digits (currently ${clean.length} digits). Example: 63 4918201 or 65 4918201`
+        );
+      }
+      return;
+    }
+
+    // Advance to Step 2: Details only if phone number is NOT already registered
+    const existing = findRegisteredRider(clean);
+    if (existing) {
       setErrorMessage(
         language === 'so'
-          ? 'Fadlan geli lambar taleefan oo sax ah (tusaale: 63 4XXXXXX ama 65 9XXXXXX)'
-          : 'Please enter a valid phone number (e.g. 63 4XXXXXX or 65 9XXXXXX)'
+          ? 'Lambarkani hore ayuu u diiwaangashanaa. Fadlan gal akoonkaaga (Log In).'
+          : 'This phone number is already registered. Please go and log in.'
       );
       return;
     }
 
-    if (!clean.startsWith('63') && !clean.startsWith('65')) {
-      if (clean.length === 7) {
-        setPhoneInput(`63${clean}`);
-      } else {
-        setErrorMessage(
-          language === 'so'
-            ? 'Lambarku waa inuu ku bilaabmaa 63 (Telesom) ama 65 (Somtel)'
-            : 'Phone number must start with 63 (Telesom) or 65 (Somtel)'
-        );
-        return;
-      }
-    }
-
-    // Advance to Step 2: Details
     setStep('details');
   };
 
@@ -260,7 +285,13 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
       setIsLoading(false);
 
       if (res.success) {
-        // Register real rider in system
+        if (pendingLoginUser) {
+          // Existing registered rider logged in via verified OTP!
+          login(pendingLoginUser);
+          return;
+        }
+
+        // Register real new rider in system
         const newRider = registerRider({
           name: fullName.trim() || 'Wadaage Passenger',
           phone: getFormattedPhone(),
@@ -296,32 +327,58 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
     }
   };
 
-  // 4. Existing User Direct Sign In
-  const handleSignInSubmit = (e: React.FormEvent) => {
+  // 4. Existing User Sign In (Strictly requires phone to be registered, then sends OTP)
+  const handleSignInSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
     const clean = getCleanPhoneDigits(phoneInput);
-    if (!clean || clean.length < 7) {
+    if (clean.length !== 9 || (!clean.startsWith('63') && !clean.startsWith('65'))) {
+      if (!clean.startsWith('63') && !clean.startsWith('65')) {
+        setErrorMessage(
+          language === 'so'
+            ? 'Lambarka taleefanku waa inuu ku bilaabmaa 63 (Telesom ZAAD) ama 65 (Somtel EDAHAB)'
+            : 'Phone number must start with 63 (Telesom) or 65 (Somtel)'
+        );
+      } else {
+        setErrorMessage(
+          language === 'so'
+            ? `Lambarka taleefanku waa inuu noqdaa 9 lambar oo keliya (hadda waa ${clean.length} lambar). Tusaale: 63 4918201 ama 65 4918201`
+            : `Rider phone number must be exactly 9 digits (currently ${clean.length} digits). Example: 63 4918201 or 65 4918201`
+        );
+      }
+      return;
+    }
+
+    // Strict Rule: Unregistered phone numbers cannot access system via login; they must register first!
+    const existing = findRegisteredRider(clean);
+    if (!existing) {
       setErrorMessage(
         language === 'so'
-          ? 'Fadlan geli lambarkaaga taleefanka'
-          : 'Please enter your registered phone number'
+          ? 'Lambarkan lama helin nidaamka. Ma lihid akoon diiwaangashan. Fadlan sameyso akoon cusub (Is-diiwaangeli).'
+          : 'This phone number is not registered in the system. Please register first.'
       );
       return;
     }
 
     setIsLoading(true);
-    setTimeout(() => {
+    try {
+      // Send OTP to registered rider
+      const res = await sendWhatsAppOtp(clean, 'rider', existing.name || 'Wadaage Rider');
       setIsLoading(false);
-      // Instant rider login
-      const riderUser = registerRider({
-        name: fullName.trim() || 'Wadaage Rider',
-        phone: getFormattedPhone(),
-        password: signInPassword || 'WadaageUser@2026',
-      });
-      login(riderUser);
-    }, 400);
+      if (res.success) {
+        setOtpDigits(['', '', '', '', '', '']);
+        setOtpExpirySeconds(272);
+        setResendCooldown(60);
+        setPendingLoginUser(existing);
+        setStep('otp');
+      } else {
+        setErrorMessage(res.message || 'OTP delivery failed. Please try again.');
+      }
+    } catch (_err) {
+      setIsLoading(false);
+      setErrorMessage('Network connection error. Please try again.');
+    }
   };
 
   // Resend OTP handler
@@ -380,9 +437,39 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
 
       {/* ERROR ALERT NOTIFICATION */}
       {errorMessage && (
-        <div className="mx-4 mt-2 p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl text-xs font-semibold flex items-center space-x-2 z-40 animate-fade-in">
-          <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
-          <span>{errorMessage}</span>
+        <div className="mx-4 mt-2 p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl text-xs font-semibold z-40 animate-fade-in shadow-sm">
+          <div className="flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+            <span className="flex-1">{errorMessage}</span>
+          </div>
+
+          {/* Quick Action when phone is already registered: Direct CTA to Login */}
+          {(errorMessage.includes('hore ayuu u diiwaangashanaa') || errorMessage.includes('already registered')) && (
+            <button
+              type="button"
+              onClick={() => {
+                setErrorMessage(null);
+                setStep('signIn');
+              }}
+              className="mt-2.5 w-full py-2 px-3 bg-[#0066FF] hover:bg-[#0052CC] active:scale-95 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow transition cursor-pointer"
+            >
+              <span>Gal Akoonkaaga Hadda (Go to Login) ➔</span>
+            </button>
+          )}
+
+          {/* Quick Action when phone is NOT registered: Direct CTA to Register */}
+          {(errorMessage.includes('lama helin nidaamka') || errorMessage.includes('not registered')) && (
+            <button
+              type="button"
+              onClick={() => {
+                setErrorMessage(null);
+                setStep('phone');
+              }}
+              className="mt-2.5 w-full py-2 px-3 bg-[#008751] hover:bg-[#007445] active:scale-95 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow transition cursor-pointer"
+            >
+              <span>Is-diiwaangeli Hadda (Register Now) ➔</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -540,26 +627,86 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
             </div>
 
             <form onSubmit={handlePhoneSubmit} className="space-y-4">
-              {/* Phone Input Box with Somaliland Flag and Phone Icon */}
-              <div className="relative flex items-center bg-white border-2 border-slate-200 focus-within:border-[#0066FF] focus-within:ring-2 focus-within:ring-[#0066FF]/20 rounded-2xl px-3 py-2.5 shadow-sm transition">
-                {/* Somaliland Flag Badge */}
-                <div className="flex items-center pr-2.5 border-r border-slate-200">
-                  <SomalilandFlag className="w-7 h-4.5 rounded-xs shadow-xs" />
+              {/* Phone Input Box with Somaliland Flag, +252 code, and Phone Icon */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 flex items-center justify-between mb-1.5">
+                  <span className="flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-[#0066FF]" />
+                    <span>Lambarka Taleefanka Rakaabka (9 Digits)</span>
+                  </span>
+                  <span className="text-[10px] font-mono font-bold text-[#0066FF] bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                    {phoneInput.length}/9 lambar
+                  </span>
+                </label>
+
+                <div className="relative flex items-center bg-white border-2 border-slate-200 focus-within:border-[#0066FF] focus-within:ring-2 focus-within:ring-[#0066FF]/20 rounded-2xl px-3 py-2.5 shadow-sm transition">
+                  {/* Somaliland Flag + +252 Badge */}
+                  <div className="flex items-center space-x-1.5 pr-2.5 border-r border-slate-200 shrink-0">
+                    <SomalilandFlag className="w-6 h-4 rounded-xs shadow-xs" />
+                    <span className="font-mono font-black text-xs text-slate-800 tracking-wider">+252</span>
+                  </div>
+
+                  <input
+                    type="tel"
+                    autoFocus
+                    maxLength={9}
+                    value={phoneInput}
+                    onChange={(e) => handlePhoneInputChange(e.target.value)}
+                    placeholder="63 4918201 ama 65..."
+                    className="w-full pl-3 pr-8 py-1 text-sm sm:text-base font-mono font-bold text-slate-900 placeholder-slate-400 focus:outline-none bg-transparent tracking-wider"
+                  />
+
+                  <Phone className="w-4 h-4 text-slate-400 absolute right-3 pointer-events-none" />
                 </div>
 
-                <input
-                  type="tel"
-                  autoFocus
-                  value={phoneInput}
-                  onChange={(e) => {
-                    setPhoneInput(e.target.value);
-                    if (errorMessage) setErrorMessage(null);
-                  }}
-                  placeholder="Gali lambarkaaga taleefanka"
-                  className="w-full pl-3 pr-8 py-1 text-sm sm:text-base font-bold text-slate-900 placeholder-slate-400 focus:outline-none bg-transparent"
-                />
+                {/* Real-time Operator & 9-digit validation hint badges */}
+                <div className="flex items-center justify-between text-[11px] mt-1.5 px-1 font-semibold">
+                  <div className="flex items-center gap-1.5">
+                    {phoneInput.startsWith('63') && (
+                      <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 flex items-center gap-1 text-[10px]">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        <span>Telesom (ZAAD)</span>
+                      </span>
+                    )}
+                    {phoneInput.startsWith('65') && (
+                      <span className="text-cyan-600 bg-cyan-50 px-2 py-0.5 rounded-md border border-cyan-200 flex items-center gap-1 text-[10px]">
+                        <CheckCircle2 className="w-3 h-3 text-cyan-600" />
+                        <span>Somtel (EDAHAB)</span>
+                      </span>
+                    )}
+                    {!phoneInput.startsWith('63') && !phoneInput.startsWith('65') && (
+                      <span className="text-amber-600 text-[10px]">
+                        Ku bilow 63 ama 65
+                      </span>
+                    )}
+                  </div>
 
-                <Phone className="w-4 h-4 text-slate-400 absolute right-3 pointer-events-none" />
+                  {phoneInput.length === 9 && (phoneInput.startsWith('63') || phoneInput.startsWith('65')) && (
+                    <span className="text-emerald-600 font-bold flex items-center gap-1 text-[10px]">
+                      <CheckCircle className="w-3 h-3" />
+                      <span>9 Lambar Sax ah</span>
+                    </span>
+                  )}
+                </div>
+
+                {/* Quick preset chips */}
+                <div className="flex items-center gap-2 mt-2 pt-1">
+                  <span className="text-[10px] text-slate-400 font-bold">Tusaale:</span>
+                  <button
+                    type="button"
+                    onClick={() => handlePhoneInputChange('634918201')}
+                    className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 transition"
+                  >
+                    63 4918201
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handlePhoneInputChange('654918201')}
+                    className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-cyan-50 text-slate-700 hover:text-cyan-700 border border-slate-200 transition"
+                  >
+                    65 4918201
+                  </button>
+                </div>
               </div>
 
               {/* Blue Security Notice Box */}
@@ -969,22 +1116,75 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
           {/* Sign In Form */}
           <div className="px-5 py-2 space-y-3 z-10">
             <form onSubmit={handleSignInSubmit} className="space-y-3">
-              {/* Phone Input Box */}
-              <div className="flex items-center bg-white rounded-2xl px-3 py-2.5 shadow-md">
-                <div className="pr-2.5 border-r border-slate-200">
-                  <SomalilandFlag className="w-7 h-4.5 rounded-xs" />
+              {/* Phone Input Box with Somaliland Flag and +252 Prefix */}
+              <div>
+                <div className="flex items-center justify-between text-[11px] font-bold text-white/90 mb-1">
+                  <span>Lambarka Taleefanka Rakaabka (9 Digits)</span>
+                  <span className="font-mono text-[10px] text-[#00E575] bg-black/30 px-2 py-0.5 rounded-full border border-[#00E575]/30">
+                    {phoneInput.length}/9 lambar
+                  </span>
                 </div>
-                <input
-                  type="tel"
-                  autoFocus
-                  value={phoneInput}
-                  onChange={(e) => {
-                    setPhoneInput(e.target.value);
-                    if (errorMessage) setErrorMessage(null);
-                  }}
-                  placeholder="Gali lambarkaaga (63/65)"
-                  className="w-full pl-3 pr-2 text-sm font-bold text-slate-900 placeholder-slate-400 focus:outline-none"
-                />
+
+                <div className="flex items-center bg-white rounded-2xl px-3 py-2.5 shadow-md border-2 border-transparent focus-within:border-[#00E575]">
+                  <div className="flex items-center space-x-1.5 pr-2.5 border-r border-slate-200 shrink-0">
+                    <SomalilandFlag className="w-6 h-4 rounded-xs shadow-xs" />
+                    <span className="font-mono font-black text-xs text-slate-800 tracking-wider">+252</span>
+                  </div>
+                  <input
+                    type="tel"
+                    autoFocus
+                    maxLength={9}
+                    value={phoneInput}
+                    onChange={(e) => handlePhoneInputChange(e.target.value)}
+                    placeholder="63 4918201 ama 65..."
+                    className="w-full pl-3 pr-2 text-sm font-mono font-bold text-slate-900 placeholder-slate-400 focus:outline-none tracking-wider"
+                  />
+                </div>
+
+                {/* Operator Badge & Validation Hint */}
+                <div className="flex items-center justify-between text-[10px] mt-1.5 px-1 font-semibold">
+                  <div className="flex items-center gap-1.5">
+                    {phoneInput.startsWith('63') && (
+                      <span className="text-emerald-300 bg-emerald-950/70 px-2 py-0.5 rounded border border-emerald-500/40">
+                        ✓ 63 (Telesom ZAAD)
+                      </span>
+                    )}
+                    {phoneInput.startsWith('65') && (
+                      <span className="text-cyan-300 bg-cyan-950/70 px-2 py-0.5 rounded border border-cyan-500/40">
+                        ✓ 65 (Somtel EDAHAB)
+                      </span>
+                    )}
+                    {!phoneInput.startsWith('63') && !phoneInput.startsWith('65') && (
+                      <span className="text-amber-300">
+                        Ku bilow 63 ama 65
+                      </span>
+                    )}
+                  </div>
+                  {phoneInput.length === 9 && (phoneInput.startsWith('63') || phoneInput.startsWith('65')) && (
+                    <span className="text-[#00E575] font-bold">
+                      ✓ 9 Lambar Sax ah
+                    </span>
+                  )}
+                </div>
+
+                {/* Quick Sample Buttons */}
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  <span className="text-[10px] text-white/60 font-medium">Tusaale:</span>
+                  <button
+                    type="button"
+                    onClick={() => handlePhoneInputChange('634918201')}
+                    className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[#00E575] border border-white/15 transition cursor-pointer"
+                  >
+                    63 4918201
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handlePhoneInputChange('654918201')}
+                    className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-cyan-300 border border-white/15 transition cursor-pointer"
+                  >
+                    65 4918201
+                  </button>
+                </div>
               </div>
 
               {/* Action Button: "Gal Akoonka ➔" */}

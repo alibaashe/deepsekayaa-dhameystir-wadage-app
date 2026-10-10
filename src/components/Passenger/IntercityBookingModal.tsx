@@ -323,11 +323,18 @@ export const IntercityBookingModal: React.FC<IntercityBookingModalProps> = ({
                     Contact Phone (ZAAD / EVC)
                   </label>
                   <input
-                    type="text"
+                    type="tel"
+                    maxLength={9}
                     value={passengerPhone}
-                    onChange={(e) => setPassengerPhone(e.target.value)}
-                    className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:border-teal-500"
-                    placeholder="e.g. +252 63 6807814"
+                    onChange={(e) => {
+                      let clean = e.target.value.replace(/\D/g, '');
+                      if (clean.startsWith('00252')) clean = clean.substring(5);
+                      else if (clean.startsWith('252')) clean = clean.substring(3);
+                      if (clean.startsWith('0')) clean = clean.substring(1);
+                      setPassengerPhone(clean.substring(0, 9));
+                    }}
+                    className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-mono font-bold focus:outline-none focus:border-teal-500"
+                    placeholder="63 4918201 ama 65..."
                   />
                 </div>
               </div>

@@ -17,8 +17,17 @@ export const WaitingTimeMeter: React.FC<WaitingTimeMeterProps> = ({
     return null;
   }
 
+  // Strict Rule: Wadaage Share does NOT have waiting time counting. Only Normal Taxi has counting waiting!
+  const isWadaageShare = currentRide.category === 'wadaage_share' || currentRide.service_type === 'Wadaage' || !!currentRide.isShared;
+  if (isWadaageShare) {
+    return null;
+  }
+
   // Normal Taxi or private rides
-  const isNormalTaxi = currentRide.category === 'wadaage_taxi' || currentRide.service_type === 'Normal' || !currentRide.isShared;
+  const isNormalTaxi = currentRide.category === 'wadaage_taxi' || currentRide.category === 'wadaage_car' || currentRide.service_type === 'Normal' || !currentRide.isShared;
+  if (!isNormalTaxi) {
+    return null;
+  }
 
   const seconds = currentRide.waitingSeconds || 0;
   const isActive = !!currentRide.isWaitingActive;

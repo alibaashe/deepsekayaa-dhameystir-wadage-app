@@ -16,6 +16,7 @@ import {
   Power,
   Shield,
   ShieldAlert,
+  ShieldCheck,
   Sparkles,
   User,
   Users,
@@ -49,6 +50,8 @@ import {
   Crosshair,
   Plus as PlusIcon,
   Minus as MinusIcon,
+  Play,
+  Pause,
 } from 'lucide-react';
 import { useRide } from '../../context/RideContext';
 import { useFuel } from '../../context/FuelContext';
@@ -72,7 +75,14 @@ import { WaitingTimeMeter } from '../Common/WaitingTimeMeter';
 import { SomalilandFlag } from '../Common/SomalilandFlag';
 import { ChatModal } from '../Passenger/ChatModal';
 import { WadaageDriverDashboard } from './WadaageDriverDashboard';
-import { formatCurrency, EXCHANGE_RATE_USD_TO_SLSH, calculateDistanceKm } from '../../utils/geo';
+import {
+  formatCurrency,
+  EXCHANGE_RATE_USD_TO_SLSH,
+  calculateDistanceKm,
+  calculateBearing,
+  findNearestHargeisaPlace,
+  fetchRealHargeisaRoadRoute,
+} from '../../utils/geo';
 import { HARGEISA_PLACES, HargeisaPlace, getHargeisaSearchHaystack } from '../../data/hargeisaPlaces';
 import { notificationService } from '../../services/notificationService';
 import { sounds } from '../../utils/audio';
@@ -120,6 +130,8 @@ export const MobileDriverApp: React.FC = () => {
     updateDriverLiveCoordinates,
     allPlatformRides,
     createStreetHailRide,
+    updateTaximeterTraveledKm,
+    roadRoute,
     meterKm: liveMeterKm,
     meterSeconds: liveMeterSeconds,
     meterFareUsd: liveCalculatedFareUsd,
@@ -207,6 +219,119 @@ export const MobileDriverApp: React.FC = () => {
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch (_e) {}
   }, [currentRide]);
+
+  // Real-Time Road Driving Telematics & Standing Meter Stepper
+  const [isAutoDriving, setIsAutoDriving] = useState<boolean>(false);
+  const [currentRoadStepIdx, setCurrentRoadStepIdx] = useState<number>(0);
+  const [activeRouteCoords, setActiveRouteCoords] = useState<Array<[number, number]>>([]);
+  const [currentRoadName, setCurrentRoadName] = useState<string>('');
+
+  // Fetch or update real road polyline coordinates when trip is in_progress
+  useEffect(() => {
+    if (!currentRide || currentRide.status !== 'in_progress') {
+      setIsAutoDriving(false);
+      setCurrentRoadStepIdx(0);
+      setActiveRouteCoords([]);
+      setCurrentRoadName('');
+      return;
+    }
+
+    const startLoc = {
+      lat: currentRide.pickup?.lat || driverGpsStatus?.lat || 9.5600,
+      lng: currentRide.pickup?.lng || driverGpsStatus?.lng || 44.0650,
+    };
+    const endLoc = {
+      lat: currentRide.dropoff?.lat || 9.5800,
+      lng: currentRide.dropoff?.lng || 44.0850,
+    };
+
+    if (roadRoute?.coordinates && roadRoute.coordinates.length > 2) {
+      setActiveRouteCoords(roadRoute.coordinates);
+      const first = findNearestHargeisaPlace(startLoc.lat, startLoc.lng);
+      setCurrentRoadName(first.name);
+    } else {
+      fetchRealHargeisaRoadRoute(startLoc, endLoc).then((res) => {
+        if (res?.coordinates && res.coordinates.length > 0) {
+          setActiveRouteCoords(res.coordinates);
+          const first = findNearestHargeisaPlace(startLoc.lat, startLoc.lng);
+          setCurrentRoadName(first.name);
+        }
+      });
+    }
+  }, [currentRide?.id, currentRide?.status, roadRoute, driverGpsStatus?.lat, driverGpsStatus?.lng]);
+
+  // Execute a single genuine road driving step along real Hargeisa road coordinates
+  const handleDriveRoadStep = useCallback(() => {
+    if (!currentRide || currentRide.status !== 'in_progress') return;
+    sounds.playButtonClick();
+
+    let coords = activeRouteCoords;
+    if (!coords || coords.length < 2) {
+      const pLat = currentRide.pickup?.lat || 9.5600;
+      const pLng = currentRide.pickup?.lng || 44.0650;
+      const dLat = currentRide.dropoff?.lat || 9.5800;
+      const dLng = currentRide.dropoff?.lng || 44.0850;
+      coords = [];
+      const totalSteps = 25;
+      for (let i = 0; i <= totalSteps; i++) {
+        const t = i / totalSteps;
+        coords.push([pLng + t * (dLng - pLng), pLat + t * (dLat - pLat)]);
+      }
+      setActiveRouteCoords(coords);
+    }
+
+    const curIdx = currentRoadStepIdx;
+    const nextIdx = Math.min(coords.length - 1, curIdx + 1);
+
+    const prevPt = coords[curIdx] || coords[0];
+    const nextPt = coords[nextIdx];
+
+    const prevLat = prevPt[1];
+    const prevLng = prevPt[0];
+    const nextLat = nextPt[1];
+    const nextLng = nextPt[0];
+
+    // Compute exact road segment distance covered
+    const stepKm = Math.max(0.04, calculateDistanceKm(prevLat, prevLng, nextLat, nextLng));
+    const bearing = calculateBearing({ lat: prevLat, lng: prevLng }, { lat: nextLat, lng: nextLng });
+
+    // Update real road telematics for driver and map
+    updateDriverLiveCoordinates(nextLat, nextLng, 5, bearing, 34, true);
+
+    // Directly increment the live taximeter odometer
+    updateTaximeterTraveledKm(stepKm);
+
+    // Update real road name
+    try {
+      const nearest = findNearestHargeisaPlace(nextLat, nextLng);
+      if (nearest?.name) {
+        setCurrentRoadName(nearest.name);
+      }
+    } catch (_e) {}
+
+    setCurrentRoadStepIdx(nextIdx);
+
+    if (nextIdx >= coords.length - 1) {
+      setIsAutoDriving(false);
+      sounds.playAcceptedChime();
+    }
+  }, [currentRide, activeRouteCoords, currentRoadStepIdx, updateDriverLiveCoordinates, updateTaximeterTraveledKm]);
+
+  // Auto real-time driving interval loop (32 km/h simulated urban driving in Hargeisa)
+  useEffect(() => {
+    if (!isAutoDriving || !currentRide || currentRide.status !== 'in_progress') return;
+
+    const timer = setInterval(() => {
+      handleDriveRoadStep();
+    }, 1500);
+
+    return () => clearInterval(timer);
+  }, [isAutoDriving, currentRide?.id, currentRide?.status, handleDriveRoadStep]);
+
+  const handleToggleAutoDriving = () => {
+    sounds.playButtonClick();
+    setIsAutoDriving((prev) => !prev);
+  };
 
   // Determine current driver's KYC status
   const currentDriverRecord = drivers.find(
@@ -677,6 +802,63 @@ export const MobileDriverApp: React.FC = () => {
             </div>
           )}
 
+          {/* Active Radar Scanner Status Card when driver is online and waiting */}
+          {!incomingDriverRequest &&
+            driverModeOnline &&
+            (!currentRide || currentRide.status === 'searching' || currentRide.status === 'idle') && (
+              <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-4 rounded-3xl border border-slate-700 shadow-xl space-y-3 animate-fadeIn">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2.5">
+                    <span className="relative flex h-3.5 w-3.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500"></span>
+                    </span>
+                    <div>
+                      <h4 className="font-extrabold text-sm text-white flex items-center gap-1.5">
+                        <span>Radar-ka Wuu Shaqaynayaa</span>
+                        <span className="text-[10px] text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-700/60 font-mono">
+                          LIVE
+                        </span>
+                      </h4>
+                      <p className="text-[11px] text-slate-300">
+                        Raadinta dalabyada u dhow goobtaada GPS
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                      Search Radius
+                    </span>
+                    <span className="font-mono font-black text-sm text-emerald-400 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
+                      &le; {getDispatchRadiusKm()} KM
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-slate-800/90 p-2.5 rounded-xl border border-slate-700/80">
+                    <span className="text-[10px] text-slate-400 block font-semibold">Adeegga (Service Mode)</span>
+                    <span className="font-black text-amber-300 text-xs flex items-center gap-1 mt-0.5">
+                      <span>🚖 Normal & 👥 Wadaage</span>
+                    </span>
+                  </div>
+                  <div className="bg-slate-800/90 p-2.5 rounded-xl border border-slate-700/80">
+                    <span className="text-[10px] text-slate-400 block font-semibold">Xadka Masafada (Strict Limit)</span>
+                    <span className="font-black text-emerald-400 text-xs flex items-center gap-1 mt-0.5">
+                      <span>🎯 {getDispatchRadiusKm()} KM GPS Area</span>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 p-2 rounded-xl bg-blue-950/40 border border-blue-800/50 text-[10px] text-blue-200">
+                  <ShieldCheck className="w-4 h-4 text-blue-400 shrink-0" />
+                  <span>
+                    Dalabyada ka baxsan <b>{getDispatchRadiusKm()} KM</b> laguma soo diri doono. Kaliya macamiisha {getDispatchRadiusKm()} km gudahooda ayaa ku helaya.
+                  </span>
+                </div>
+              </div>
+          )}
+
           {/* On-Route Second Rider (Passenger B) Dispatch Overlay ONLY if Driver is in a Wadaage Share trip with 1 rider */}
           {incomingDriverRequest &&
             currentRide &&
@@ -693,7 +875,7 @@ export const MobileDriverApp: React.FC = () => {
               <div className="bg-emerald-600 text-white px-3 py-2 rounded-2xl flex items-center gap-2 shadow-sm">
                 <Sparkles className="w-4 h-4 shrink-0 animate-pulse text-amber-300" />
                 <span className="text-xs font-bold leading-tight">
-                  New Rider nearby going your way (1.5km away, similar destination).
+                  New Rider nearby going your way (within {getDispatchRadiusKm('wadaage_share')} km GPS corridor).
                 </span>
               </div>
 
@@ -735,7 +917,7 @@ export const MobileDriverApp: React.FC = () => {
                 <div className="grid grid-cols-2 gap-1.5 text-[10px] text-slate-600 pt-2 border-t border-slate-100">
                   <div className="bg-emerald-50 text-emerald-900 px-2 py-1 rounded-lg font-semibold border border-emerald-200 flex items-center gap-1">
                     <CheckCircle className="w-3 h-3 text-emerald-600 shrink-0" />
-                    <span>Pickup: <b>&le; 1.5 km GPS</b></span>
+                    <span>Pickup: <b>&le; {getDispatchRadiusKm('wadaage_share')} km GPS</b></span>
                   </div>
                   <div className="bg-emerald-50 text-emerald-900 px-2 py-1 rounded-lg font-semibold border border-emerald-200 flex items-center gap-1">
                     <CheckCircle className="w-3 h-3 text-emerald-600 shrink-0" />
@@ -825,7 +1007,7 @@ export const MobileDriverApp: React.FC = () => {
                                 {isShareOrder ? '👥 Wadaage Share' : '🚖 Taxi Gaar ah (Private)'}
                               </span>
                               <span className="text-[10px] font-bold text-slate-500">
-                                📍 {radiusCheck.distanceKm} km
+                                📍 {radiusCheck.distanceKm} km (≤ {radiusCheck.allowedRadiusKm} km radius)
                               </span>
                             </div>
                           </div>
@@ -1084,6 +1266,41 @@ export const MobileDriverApp: React.FC = () => {
                     </span>
                   </div>
                 </div>
+
+                {/* Real-time road driving step buttons in mini map HUD */}
+                {currentRide.status === 'in_progress' && (
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={handleDriveRoadStep}
+                      className="py-2 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-black text-[10.5px] border border-slate-700 flex items-center justify-center space-x-1 transition cursor-pointer shadow"
+                    >
+                      <Zap className="w-3 h-3 text-amber-400" />
+                      <span>🚗 Tallaabo (+Step)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleToggleAutoDriving}
+                      className={`py-2 px-2 rounded-xl text-white font-black text-[10.5px] border flex items-center justify-center space-x-1 transition cursor-pointer shadow active:scale-95 ${
+                        isAutoDriving
+                          ? 'bg-amber-600 hover:bg-amber-700 border-amber-400 text-white animate-pulse'
+                          : 'bg-[#008751] hover:bg-[#007445] border-emerald-400/50 text-white'
+                      }`}
+                    >
+                      {isAutoDriving ? (
+                        <>
+                          <Pause className="w-3 h-3 text-white" />
+                          <span>⏸️ Jooji</span>
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-3 h-3 text-emerald-200" />
+                          <span>▶️ Wad Toos Ah</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
 
                 {/* Primary Action Button */}
                 <button
@@ -1384,7 +1601,7 @@ export const MobileDriverApp: React.FC = () => {
                                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                               </span>
                               <span className="text-[11px] font-black uppercase tracking-wider text-emerald-400">
-                                📟 {currentRide.isLiveTaximeter ? 'Live Taximeter Running' : 'Trip Meter'}
+                                📟 {currentRide.isLiveTaximeter ? 'Mitirka Safarka Waa Socdaa • Live Taximeter' : 'Trip Meter'}
                               </span>
                             </div>
                             <span className="text-[10px] font-mono bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full border border-slate-700">
@@ -1392,11 +1609,29 @@ export const MobileDriverApp: React.FC = () => {
                             </span>
                           </div>
 
+                          {/* Real-time Road Location & Live Speed Badge */}
+                          <div className="flex items-center justify-between bg-slate-950/90 px-3 py-1.5 rounded-xl border border-slate-800 text-xs">
+                            <div className="flex items-center space-x-1.5 min-w-0">
+                              <Navigation className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                              <span className="text-[11px] text-slate-200 font-bold truncate">
+                                {currentRoadName || currentRide.pickup?.name || 'Wadada Wadnaha (Road 2)'}
+                              </span>
+                            </div>
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border font-mono shrink-0 ${
+                              isAutoDriving
+                                ? 'bg-emerald-950 text-emerald-300 border-emerald-500/50 animate-pulse'
+                                : 'bg-amber-950/60 text-amber-300 border-amber-500/40'
+                            }`}>
+                              {isAutoDriving ? '🚗 34 km/h • Socda' : '⏸️ 0 km/h • Taagan (Idle)'}
+                            </span>
+                          </div>
+
                           <div className="grid grid-cols-2 gap-2 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
                             <div>
                               <span className="text-[10px] uppercase font-bold text-slate-400 block">Distance Travelled</span>
-                              <span className="text-base font-black text-white font-mono">
-                                {displayedMeterKm.toFixed(2)} KM
+                              <span className="text-base font-black text-white font-mono flex items-baseline gap-1">
+                                <span>{displayedMeterKm.toFixed(2)}</span>
+                                <span className="text-xs text-emerald-400">KM</span>
                               </span>
                             </div>
                             <div className="text-right">
@@ -1414,6 +1649,61 @@ export const MobileDriverApp: React.FC = () => {
                             <span>1st KM: 12,000 SLSH ($1.20)</span>
                             <span>Extra KM: +7,000 SLSH/km</span>
                           </div>
+
+                          {/* Real-Time Road Driving Controls (Tallaabo kasta / Real Road Step) */}
+                          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800/80">
+                            <button
+                              type="button"
+                              onClick={handleDriveRoadStep}
+                              className="py-2.5 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-black text-[11px] border border-slate-700 flex items-center justify-center space-x-1.5 transition cursor-pointer shadow"
+                              title="Advance vehicle to next real road coordinate node and add KM to meter"
+                            >
+                              <Zap className="w-3.5 h-3.5 text-amber-400" />
+                              <span>🚗 Tallaabo (+Road Step)</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleToggleAutoDriving}
+                              className={`py-2.5 px-2 rounded-xl text-white font-black text-[11px] border flex items-center justify-center space-x-1.5 transition cursor-pointer shadow active:scale-95 ${
+                                isAutoDriving
+                                  ? 'bg-amber-600 hover:bg-amber-700 border-amber-400 text-white animate-pulse'
+                                  : 'bg-[#008751] hover:bg-[#007445] border-emerald-400/50 text-white'
+                              }`}
+                              title={isAutoDriving ? 'Stop simulated driving to let standing meter accumulate' : 'Start auto real-time road driving simulation'}
+                            >
+                              {isAutoDriving ? (
+                                <>
+                                  <Pause className="w-3.5 h-3.5 text-white" />
+                                  <span>⏸️ Jooji (Taagan)</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Play className="w-3.5 h-3.5 text-emerald-200" />
+                                  <span>▶️ Wad Toos Ah</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+
+                          {/* Wadaage Share: Match 2nd Passenger Along Corridor */}
+                          {currentRide.isShared && !currentRide.coPassenger && !currentRide.stackedRide && (
+                            <div className="p-2 bg-gradient-to-r from-emerald-950/80 to-teal-950/80 border border-emerald-500/40 rounded-xl flex items-center justify-between text-white text-xs">
+                              <div className="flex items-center space-x-1.5 min-w-0">
+                                <Users className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                <div className="truncate">
+                                  <div className="font-extrabold text-[10.5px] text-emerald-300">Wadaage Share (Carpool)</div>
+                                  <div className="text-[9px] text-slate-300">Match 2nd rider on your route</div>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => orderSecondRiderForWadaageShare()}
+                                className="py-1 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[10px] transition cursor-pointer active:scale-95 shadow shrink-0"
+                              >
+                                👥 Match Rider B
+                              </button>
+                            </div>
+                          )}
 
                           {currentRide.isLiveTaximeter && (
                             <div className={`text-[9.5px] font-bold rounded-lg px-2 py-1 border ${

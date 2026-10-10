@@ -103,8 +103,8 @@ export const DriverRegistrationModal: React.FC<DriverRegistrationModalProps> = (
     setErrorMessage(null);
 
     const cleanDigits = normalizeSomalilandPhone(formData.phone);
-    if (!cleanDigits || cleanDigits.length < 7) {
-      setErrorMessage('Please enter a valid Somaliland phone number (e.g. 63 7123456 or 65 4918201).');
+    if (!cleanDigits || cleanDigits.length !== 9 || (!cleanDigits.startsWith('63') && !cleanDigits.startsWith('65'))) {
+      setErrorMessage('Fadlan geli lambar sax ah oo 9 god ah oo ku bilaabmaya 63 (Telesom) ama 65 (Somtel), tusaale: 63 4918201 ama 65 4918201.');
       return;
     }
 

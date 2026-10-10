@@ -133,7 +133,7 @@ export const DEFAULT_CATEGORY_CONFIGS: Record<string, CategoryServiceConfig> = {
     cancellationFeeUsd: 0.00, // 0 SLSH - Free Cancellation on both sides
     maxPassengers: 2,
     maxWaitTimeMins: 3,
-    dispatchRadiusKm: 1.0, // Strict 1.0 KM Dispatch Radius
+    dispatchRadiusKm: 1.5, // Strict 1.5 KM Dispatch Radius
     rules: {
       maxSeatsPerBooking: 2,
       maxDetourMins: 10,
@@ -156,7 +156,7 @@ export const DEFAULT_CATEGORY_CONFIGS: Record<string, CategoryServiceConfig> = {
     cancellationFeeUsd: 0.00, // 0 SLSH - Free Cancellation on both sides
     maxPassengers: 4,
     maxWaitTimeMins: 5,
-    dispatchRadiusKm: 1.0, // Strict 1.0 KM Dispatch Radius
+    dispatchRadiusKm: 1.5, // Strict 1.5 KM Dispatch Radius
     rules: {
       autoAssignNearest: true,
       graceCancellationMins: 3,
@@ -178,7 +178,7 @@ export const DEFAULT_CATEGORY_CONFIGS: Record<string, CategoryServiceConfig> = {
     cancellationFeeUsd: 0.00, // 0 SLSH - Free Cancellation on both sides
     maxPassengers: 4,
     maxWaitTimeMins: 5,
-    dispatchRadiusKm: 1.0, // Strict 1.0 KM Dispatch Radius
+    dispatchRadiusKm: 1.5, // Strict 1.5 KM Dispatch Radius
     rules: {
       taximeterMode: true,
       permitRequired: false,
@@ -225,8 +225,8 @@ export const INITIAL_PRICING: PricingSettings = {
   expressPoolDiscountPercent: 15,
   weatherSurgeMultiplier: 1.0,
   eventSurgeMultiplier: 1.0,
-  dispatchRadiusKm: 1.0, // Strict 1.0 KM Dispatch Radius
-  maxPickupRadiusKm: 1.0, // Max pickup distance 1.0 KM
+  dispatchRadiusKm: 1.5, // Strict 1.5 KM Dispatch Radius
+  maxPickupRadiusKm: 1.5, // Max pickup distance 1.5 KM
   categoryConfigs: DEFAULT_CATEGORY_CONFIGS,
   batchingWindowSeconds: 60,
   maxHeadingDivergenceDegrees: 45,

@@ -29,16 +29,42 @@ export const PricingSurgeControl: React.FC = () => {
     const current = formData.categoryConfigs?.[catKey];
     if (!current) return;
 
-    setFormData({
-      ...formData,
-      categoryConfigs: {
-        ...formData.categoryConfigs,
-        [catKey]: {
-          ...current,
-          [field]: value,
-        },
+    let updatedConfigs = {
+      ...formData.categoryConfigs,
+      [catKey]: {
+        ...current,
+        [field]: value,
       },
-    });
+    };
+
+    // If updating Normal Taxi dispatch radius, sync with Wadaage Car Sedan
+    if (catKey === 'wadaage_taxi' && field === 'dispatchRadiusKm') {
+      const carConfig = formData.categoryConfigs?.wadaage_car;
+      if (carConfig) {
+        updatedConfigs = {
+          ...updatedConfigs,
+          wadaage_car: {
+            ...carConfig,
+            dispatchRadiusKm: value,
+          },
+        };
+      }
+    }
+
+    const updatedFormData = {
+      ...formData,
+      categoryConfigs: updatedConfigs,
+      ...(field === 'dispatchRadiusKm'
+        ? { dispatchRadiusKm: value, maxPickupRadiusKm: value }
+        : {}),
+    };
+
+    setFormData(updatedFormData);
+
+    // If dispatchRadiusKm was commanded, immediately apply via updatePricing so changes take effect instantly
+    if (field === 'dispatchRadiusKm') {
+      updatePricing(updatedFormData);
+    }
   };
 
   const updateCategoryRule = (
@@ -421,45 +447,81 @@ export const PricingSurgeControl: React.FC = () => {
               </span>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-800 space-y-2">
+                <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-800 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <div>
                       <label className="text-slate-200 font-bold block">Driver Dispatch Search Radius</label>
                       <span className="text-[10px] text-blue-400 font-medium">
-                        Strict GPS Distance Limit
+                        Strict GPS Distance Limit ({activeTab === 'wadaage_taxi' ? 'Normal Taxi' : 'Wadaage Share'})
                       </span>
                     </div>
-                    <span className="text-blue-400 font-mono font-black text-sm bg-blue-950/60 px-2 py-0.5 rounded border border-blue-800">
-                      {activeCategory.dispatchRadiusKm} KM
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        min="0.1"
+                        max="30"
+                        step="0.1"
+                        value={activeCategory.dispatchRadiusKm}
+                        onChange={(e) =>
+                          updateCategoryConfig(activeTab, 'dispatchRadiusKm', parseFloat(e.target.value) || 1.5)
+                        }
+                        className="w-16 bg-slate-800 border border-blue-500/60 rounded px-2 py-0.5 text-right font-mono font-black text-blue-400 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      />
+                      <span className="text-blue-400 font-mono font-black text-xs bg-blue-950/60 px-2 py-1 rounded border border-blue-800">
+                        KM
+                      </span>
+                    </div>
                   </div>
                   <input
                     type="range"
                     min="0.5"
-                    max="20"
-                    step="0.5"
+                    max="10"
+                    step="0.1"
                     value={activeCategory.dispatchRadiusKm}
                     onChange={(e) =>
-                      updateCategoryConfig(activeTab, 'dispatchRadiusKm', parseFloat(e.target.value) || 1.0)
+                      updateCategoryConfig(activeTab, 'dispatchRadiusKm', parseFloat(e.target.value) || 1.5)
                     }
                     className="w-full accent-blue-500 cursor-pointer"
                   />
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {[1.0, 2.0, 3.0, 5.0, 10.0].map((radius) => (
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    {[0.8, 1.0, 1.5, 2.0, 2.5, 3.0, 5.0].map((radius) => (
                       <button
                         key={radius}
                         type="button"
                         onClick={() => updateCategoryConfig(activeTab, 'dispatchRadiusKm', radius)}
                         className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition ${
                           activeCategory.dispatchRadiusKm === radius
-                            ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
+                            ? 'bg-blue-600 text-white border-blue-500 shadow-md ring-2 ring-blue-400/40'
                             : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
                         }`}
                       >
-                        {radius === 1.0 ? '🎯 1.0 KM (Strict)' : `${radius} KM`}
+                        {radius === 1.5 ? '🎯 1.5 KM (Commanded)' : radius === 1.0 ? '🎯 1.0 KM' : `${radius} KM`}
                       </button>
                     ))}
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const commandedRadius = activeCategory.dispatchRadiusKm || 1.5;
+                      const updatedConfigs = {
+                        ...formData.categoryConfigs,
+                        wadaage_taxi: { ...formData.categoryConfigs?.wadaage_taxi, dispatchRadiusKm: commandedRadius },
+                        wadaage_car: { ...formData.categoryConfigs?.wadaage_car, dispatchRadiusKm: commandedRadius },
+                        wadaage_share: { ...formData.categoryConfigs?.wadaage_share, dispatchRadiusKm: commandedRadius },
+                      };
+                      const updated = {
+                        ...formData,
+                        categoryConfigs: updatedConfigs,
+                        dispatchRadiusKm: commandedRadius,
+                        maxPickupRadiusKm: commandedRadius,
+                      };
+                      setFormData(updated);
+                      updatePricing(updated);
+                    }}
+                    className="w-full py-1.5 px-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold text-[11px] shadow flex items-center justify-center gap-1.5 transition active:scale-95"
+                  >
+                    <span>⚡ Command {activeCategory.dispatchRadiusKm || 1.5} KM for Both Normal Taxi & Wadaage Share</span>
+                  </button>
                   <div className="p-2 rounded-lg bg-blue-950/40 border border-blue-900/50 text-[10px] text-blue-200 flex items-start gap-1.5">
                     <span>🛡️</span>
                     <span>

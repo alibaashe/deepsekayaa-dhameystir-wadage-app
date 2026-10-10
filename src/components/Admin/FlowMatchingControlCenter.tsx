@@ -478,21 +478,37 @@ export const FlowMatchingControlCenter: React.FC = () => {
             <p className="text-xs text-slate-500">
               Corridor pickup distance limit to examine and match Rider B to active driver.
             </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="0.1"
+                max="10"
+                step="0.1"
+                value={maxPickupRadiusKm}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value) || 1.5;
+                  setMaxPickupRadiusKm(val);
+                  runEvaluation(testRiderA, testRiderB, val);
+                }}
+                className="w-16 bg-slate-100 dark:bg-slate-800 border border-indigo-400 rounded px-2 py-0.5 text-right font-mono font-black text-indigo-600 dark:text-indigo-400 text-xs focus:outline-none"
+              />
+              <span className="text-[10px] text-slate-500 font-bold">KM limit</span>
+            </div>
             <input
               type="range"
               min="0.5"
               max="5.0"
-              step="0.5"
+              step="0.1"
               value={maxPickupRadiusKm}
               onChange={(e) => {
-                const val = parseFloat(e.target.value);
+                const val = parseFloat(e.target.value) || 1.5;
                 setMaxPickupRadiusKm(val);
                 runEvaluation(testRiderA, testRiderB, val);
               }}
               className="w-full accent-indigo-500 cursor-pointer"
             />
-            <div className="flex gap-1.5 pt-1">
-              {[1.0, 1.5, 2.0, 3.0].map((r) => (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {[0.8, 1.0, 1.5, 2.0, 2.5, 3.0].map((r) => (
                 <button
                   key={r}
                   type="button"
@@ -502,11 +518,11 @@ export const FlowMatchingControlCenter: React.FC = () => {
                   }}
                   className={`px-2 py-0.5 rounded text-[10px] font-bold transition ${
                     maxPickupRadiusKm === r
-                      ? 'bg-indigo-600 text-white shadow-sm'
+                      ? 'bg-indigo-600 text-white shadow-sm ring-1 ring-indigo-400'
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
                   }`}
                 >
-                  {r}km
+                  {r === 1.5 ? '🎯 1.5km' : `${r}km`}
                 </button>
               ))}
             </div>

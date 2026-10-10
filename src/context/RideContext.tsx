@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { CITY_LOCATIONS, INITIAL_PRICING, INITIAL_DRIVERS, INITIAL_DRIVER_APPLICATIONS, PROMO_CODES, VEHICLE_CATEGORY_DETAILS, INITIAL_COMMUTER_PASSES, INITIAL_INTERCITY_TRIPS, HARGEISA_DEMAND_HOTSPOTS } from '../data/mockData';
+import { CITY_LOCATIONS, INITIAL_PRICING, DEFAULT_CATEGORY_CONFIGS, INITIAL_DRIVERS, INITIAL_DRIVER_APPLICATIONS, PROMO_CODES, VEHICLE_CATEGORY_DETAILS, INITIAL_COMMUTER_PASSES, INITIAL_INTERCITY_TRIPS, HARGEISA_DEMAND_HOTSPOTS } from '../data/mockData';
 import { Language, translations } from '../data/translations';
 import {
   AuthUser,
@@ -284,7 +284,8 @@ interface RideContextType {
   dispatchDriverToRide: (rideId: string, driverId: string) => void;
   getDriverCoordinates: () => { lat: number; lng: number };
   getDispatchRadiusKm: (category?: string) => number;
-  isOrderWithinDriverDispatchRadius: (ride: { pickup?: { lat: number; lng: number }; category?: string } | null | undefined) => { isWithinRadius: boolean; distanceKm: number; allowedRadiusKm: number };
+  isOrderWithinDriverDispatchRadius: (ride: { pickup?: { lat: number; lng: number }; category?: string; service_type?: string; currentOfferedDriverId?: string } | null | undefined) => { isWithinRadius: boolean; distanceKm: number; allowedRadiusKm: number };
+  setDispatchRadius: (categoryOrBoth: 'wadaage_taxi' | 'wadaage_share' | 'both' | 'all', radiusKm: number) => void;
   validateWadaageMatch: (currentTrip: any, newRequest: any, driverLoc?: { lat: number; lng: number }, options?: any) => ValidateWadaageMatchResult;
   createStreetHailRide?: (passengerData: { name?: string; phone?: string; destinationAddress?: string; fareUsd?: number; distanceKm?: number; isLiveTaximeter?: boolean; paymentMethod?: 'cash' | 'wallet' }) => void;
   updateTaximeterTraveledKm?: (
@@ -769,8 +770,8 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const latFixed = Number(lat.toFixed(6));
     const lngFixed = Number(lng.toFixed(6));
 
-    // Feed the live taximeter odometer with every real hardware fix (driver only)
-    if (roleRef.current === 'driver' && isHardware) {
+    // Feed the live taximeter odometer with every real location fix (driver only)
+    if (roleRef.current === 'driver') {
       try { accumulateMeterFromGpsRef.current(latFixed, lngFixed); } catch {}
     }
 
@@ -1069,19 +1070,29 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (category && pricing?.categoryConfigs?.[category]?.dispatchRadiusKm !== undefined) {
       return Number(pricing.categoryConfigs[category].dispatchRadiusKm);
     }
+    // Handle category aliases for Wadaage Share
+    if (category === 'wadaage_share' || category === 'Wadaage' || category === 'shared') {
+      const shareRadius = pricing?.categoryConfigs?.wadaage_share?.dispatchRadiusKm;
+      if (shareRadius !== undefined) return Number(shareRadius);
+    }
+    // Handle category aliases for Normal Taxi
+    if (category === 'wadaage_taxi' || category === 'wadaage_car' || category === 'Normal' || category === 'taxi' || category === 'standard') {
+      const taxiRadius = pricing?.categoryConfigs?.wadaage_taxi?.dispatchRadiusKm ?? pricing?.categoryConfigs?.wadaage_car?.dispatchRadiusKm;
+      if (taxiRadius !== undefined) return Number(taxiRadius);
+    }
     if (pricing?.dispatchRadiusKm !== undefined) {
       return Number(pricing.dispatchRadiusKm);
     }
-    return 1.0; // Strict 1.0 KM limit default
+    return 1.5; // Default 1.5 KM limit
   }, [pricing]);
 
   // Helper: Check if an incoming order is within the driver's GPS dispatch search radius
   const isOrderWithinDriverDispatchRadius = useCallback((
-    ride: { pickup?: { lat: number; lng: number }; category?: string; currentOfferedDriverId?: string } | null | undefined
+    ride: { pickup?: { lat: number; lng: number }; category?: string; service_type?: string; currentOfferedDriverId?: string } | null | undefined
   ): { isWithinRadius: boolean; distanceKm: number; allowedRadiusKm: number } => {
-    const configuredRadius = getDispatchRadiusKm(ride?.category);
-    // Dynamic city threshold: allow city-wide dispatch radius (15.0 km) so active drivers across Hargeisa receive trips
-    const allowedRadiusKm = Math.max(configuredRadius || 1.0, 15.0);
+    const configuredRadius = getDispatchRadiusKm(ride?.category || ride?.service_type);
+    const allowedRadiusKm = configuredRadius > 0 ? configuredRadius : 1.5;
+
     if (!ride || !ride.pickup || typeof ride.pickup.lat !== 'number' || typeof ride.pickup.lng !== 'number') {
       return { isWithinRadius: true, distanceKm: 0.3, allowedRadiusKm };
     }
@@ -1089,20 +1100,15 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const distKm = calculateDistanceKm(driverCoords.lat, driverCoords.lng, ride.pickup.lat, ride.pickup.lng);
     const roundedDist = Math.round(distKm * 10) / 10;
 
-    const isExplicitlyTargeted = !!(
-      ride.currentOfferedDriverId &&
-      currentUser &&
-      (ride.currentOfferedDriverId === currentUser.id ||
-        ride.currentOfferedDriverId === `drv_${currentUser.id}` ||
-        ride.currentOfferedDriverId === currentUser.phone)
-    );
+    // Strict radius enforcement: driver MUST be within allowedRadiusKm (e.g. 1.5 km)
+    const isWithinRadius = roundedDist <= allowedRadiusKm;
 
     return {
-      isWithinRadius: isExplicitlyTargeted || roundedDist <= allowedRadiusKm,
+      isWithinRadius,
       distanceKm: roundedDist,
       allowedRadiusKm,
     };
-  }, [getDriverCoordinates, getDispatchRadiusKm, currentUser]);
+  }, [getDriverCoordinates, getDispatchRadiusKm]);
 
   // Sequential Proximity Candidate Resolver: Identifies the single nearest online driver via Haversine formula
   const getNearestDriverCandidate = useCallback((
@@ -1121,7 +1127,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const eligible = availableDrivers.filter((drv) => {
       // 1. Must be online, not occupied with another non-share trip, AND have prepaid wallet balance >= 0.10 USD (1,000 SLSH)
       const minThresholdUsd = pricing?.driverMinWalletThresholdUsd || 0.10;
-      const drvBal = drv.walletBalanceUsd !== undefined ? Number(drv.walletBalanceUsd) : (getDriverWalletBalance ? getDriverWalletBalance(drv.id) : 0);
+      const drvBal = drv.walletBalanceUsd !== undefined ? Number(drv.walletBalanceUsd) : (Number((drv as any).walletBalance) || 0);
       if (drv.status === 'busy' || drv.status === 'offline' || drvBal < minThresholdUsd) return false;
 
       // 2. Must not have declined this order
@@ -1160,13 +1166,19 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (eligible.length === 0) return null;
 
-    // Calculate exact Haversine distance
-    const scored = eligible.map((drv) => {
-      const dist = calculateHaversineDistanceKm(pickupLat, pickupLng, drv.currentLocation.lat, drv.currentLocation.lng);
-      return { driver: drv, distanceKm: dist };
-    });
+    const allowedRadiusKm = getDispatchRadiusKm(ride?.category || ride?.service_type);
 
-    // Sort strictly ascending by distance, prioritizing currently active human driver if distance is reasonable
+    // Calculate exact Haversine distance and strictly filter by admin dispatch search radius
+    const scored = eligible
+      .map((drv) => {
+        const dist = calculateHaversineDistanceKm(pickupLat, pickupLng, drv.currentLocation.lat, drv.currentLocation.lng);
+        return { driver: drv, distanceKm: Math.round(dist * 10) / 10 };
+      })
+      .filter((candidate) => candidate.distanceKm <= allowedRadiusKm);
+
+    if (scored.length === 0) return null;
+
+    // Sort strictly ascending by distance, prioritizing currently active human driver if within allowed radius
     scored.sort((a, b) => {
       const aIsActiveHuman = currentUser?.role === 'driver' && (a.driver.id === currentUser.id || (currentUser.phone && a.driver.phone === currentUser.phone));
       const bIsActiveHuman = currentUser?.role === 'driver' && (b.driver.id === currentUser.id || (currentUser.phone && b.driver.phone === currentUser.phone));
@@ -1176,7 +1188,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return scored[0];
-  }, [currentUser]);
+  }, [currentUser, getDispatchRadiusKm, pricing?.driverMinWalletThresholdUsd]);
 
   const [multiStops, setMultiStops] = useState<LocationNode[]>([]);
 
@@ -1512,7 +1524,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ====================================================
   const METER_FIRST_KM_SLSH = 12000; // Flag drop / base fare covering the 1st kilometer
   const METER_EXTRA_KM_SLSH = 7000;  // Charged for every KM after the 1st one
-  const METER_MIN_GPS_STEP_KM = 0.008; // Ignore GPS jitter smaller than ~8 metres
+  const METER_MIN_GPS_STEP_KM = 0.002; // Capture genuine road driving steps (>= 2 metres) while ignoring stationary noise
   const TAXIMETER_STATE_STORAGE_KEY = 'wadaage_taximeter_state';
 
   const [meterKm, setMeterKm] = useState<number>(0);
@@ -1665,8 +1677,8 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const isLiveTaxiTrip =
       roleRef.current === 'driver' &&
       !!currentRide &&
-      currentRide.isLiveTaximeter === true &&
-      currentRide.status === 'in_progress';
+      currentRide.status === 'in_progress' &&
+      (currentRide.isLiveTaximeter === true || currentRide.category === 'wadaage_taxi' || !currentRide.isShared);
 
     if (!isLiveTaxiTrip) {
       if (meterRunningRef.current) {
@@ -1674,6 +1686,10 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsMeterRunning(false);
       }
       return;
+    }
+
+    if (currentRide && !currentRide.isLiveTaximeter) {
+      currentRide.isLiveTaximeter = true;
     }
 
     if (meterRideIdRef.current !== currentRide!.id) {
@@ -2570,16 +2586,15 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
               const matchingCoRider = sortedRides.find((r) => {
                 if (r.status !== 'searching' || r.category !== 'wadaage_share' || r.id === myAssignedRide.id) return false;
                 const isDrivingEnRoute = myAssignedRide.status === 'in_progress';
-                const initialRadiusLimit = pricing?.maxPickupRadiusKm ?? 1.0;
-                const enRouteRadiusLimit = 1.5;
+                const shareRadiusLimit = getDispatchRadiusKm('wadaage_share');
                 const match = evaluateWadaageShareMatch(
                   myAssignedRide,
                   r,
                   getDriverCoordinates(),
                   {
                     isDriverEnRouteWithOneRider: isDrivingEnRoute,
-                    maxPickupRadiusKm: initialRadiusLimit,
-                    maxEnRoutePickupRadiusKm: enRouteRadiusLimit,
+                    maxPickupRadiusKm: shareRadiusLimit,
+                    maxEnRoutePickupRadiusKm: shareRadiusLimit,
                     maxHeadingDivergenceDegrees: pricing?.maxHeadingDivergenceDegrees ?? 45,
                     maxDestinationRadiusKm: pricing?.maxDestinationRadiusKm ?? 2.0,
                     maxDetourMins: pricing?.maxDetourMinutes ?? (pricing?.categoryConfigs?.wadaage_share?.rules?.maxDetourMins ?? 10),
@@ -2727,16 +2742,15 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const isIncomingShared = payload.isShared || payload.category === 'wadaage_share' || payload.service_type === 'Wadaage';
             if (currentRide.category === 'wadaage_share' && isIncomingShared && !currentRide.coPassenger && !currentRide.stackedRide && payload.pickup && payload.dropoff) {
               const isDrivingEnRoute = currentRide.status === 'in_progress';
-              const initialRadiusLimit = pricing?.maxPickupRadiusKm ?? 1.0;
-              const enRouteRadiusLimit = 1.5;
+              const shareRadiusLimit = getDispatchRadiusKm('wadaage_share');
               const matchResult = evaluateWadaageShareMatch(
                 currentRide,
                 payload,
                 getDriverCoordinates(),
                 {
                   isDriverEnRouteWithOneRider: isDrivingEnRoute,
-                  maxPickupRadiusKm: initialRadiusLimit,
-                  maxEnRoutePickupRadiusKm: enRouteRadiusLimit,
+                  maxPickupRadiusKm: shareRadiusLimit,
+                  maxEnRoutePickupRadiusKm: shareRadiusLimit,
                   maxHeadingDivergenceDegrees: pricing?.maxHeadingDivergenceDegrees ?? 45,
                   maxDestinationRadiusKm: pricing?.maxDestinationRadiusKm ?? 2.0,
                   maxDetourMins: pricing?.maxDetourMinutes ?? (pricing?.categoryConfigs?.wadaage_share?.rules?.maxDetourMins ?? 10),
@@ -4733,6 +4747,12 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Cancel Ride - Instant clean reset with idempotency guard
   const cancelRide = () => {
     if (currentRide) {
+      // Rule: When ride is in progress and rider is inside car, neither rider nor driver can cancel
+      if (currentRide.status === 'in_progress') {
+        console.warn('[RideContext] Ride is already in progress (rider inside car); cancellation is disabled.');
+        return;
+      }
+
       const rideId = currentRide.id;
       markRideAsCancelled(rideId);
       const cancelledRide: RideRequest = {
@@ -5317,6 +5337,15 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIncomingDriverRequest(null);
       sounds.playAcceptedChime();
 
+      try {
+        localStorage.setItem('wadaage_current_ride', JSON.stringify(updated));
+        localStorage.setItem('wadaage_active_ride', JSON.stringify(updated));
+      } catch {}
+
+      // Instant optimistic broadcast: Rider receives driver accepted status immediately (0ms delay)
+      broadcastRideEvent('RIDE_ACCEPTED', updated);
+      broadcastRideEvent('RIDE_STATUS_UPDATED', updated);
+
       // Mark driver as busy
       setDrivers((prev) =>
         prev.map((d) => (d.id === idToAssign ? { ...d, status: 'busy' } : d))
@@ -5875,7 +5904,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setTimeout(() => {
         isActionPendingRef.current = false;
-      }, 200);
+      }, 50);
     }
   };
 
@@ -5898,6 +5927,10 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
         optimalWaypointsSequence: updatedWaypoints || currentRide.optimalWaypointsSequence,
       };
       setCurrentRide(arrivedRide);
+      try {
+        localStorage.setItem('wadaage_current_ride', JSON.stringify(arrivedRide));
+        localStorage.setItem('wadaage_active_ride', JSON.stringify(arrivedRide));
+      } catch {}
       saveRideToFirestore(arrivedRide);
       syncRideToHostinger(arrivedRide);
       broadcastRideEvent('RIDE_STATUS_UPDATED', arrivedRide);
@@ -6117,6 +6150,59 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return updated;
     });
   };
+
+  // Programmatic & Control Panel Dispatch Radius Commander:
+  // Commands exact search radius (e.g. 1.5 KM) for Normal Taxi, Wadaage Share, or Both
+  const setDispatchRadius = useCallback((categoryOrBoth: 'wadaage_taxi' | 'wadaage_share' | 'both' | 'all', radiusKm: number) => {
+    const validRadius = Math.max(0.1, Math.round((Number(radiusKm) || 1.5) * 10) / 10);
+    setPricing((prev) => {
+      const currentConfigs = prev.categoryConfigs || DEFAULT_CATEGORY_CONFIGS;
+      let newConfigs = { ...currentConfigs };
+
+      if (categoryOrBoth === 'wadaage_taxi' || categoryOrBoth === 'both' || categoryOrBoth === 'all') {
+        newConfigs = {
+          ...newConfigs,
+          wadaage_taxi: {
+            ...newConfigs.wadaage_taxi,
+            dispatchRadiusKm: validRadius,
+          },
+          wadaage_car: {
+            ...newConfigs.wadaage_car,
+            dispatchRadiusKm: validRadius,
+          },
+        };
+      }
+
+      if (categoryOrBoth === 'wadaage_share' || categoryOrBoth === 'both' || categoryOrBoth === 'all') {
+        newConfigs = {
+          ...newConfigs,
+          wadaage_share: {
+            ...newConfigs.wadaage_share,
+            dispatchRadiusKm: validRadius,
+          },
+        };
+      }
+
+      const updated: PricingSettings = {
+        ...prev,
+        categoryConfigs: newConfigs,
+        dispatchRadiusKm: validRadius,
+        maxPickupRadiusKm: validRadius,
+      };
+
+      try {
+        localStorage.setItem('wadaage_pricing_settings', JSON.stringify(updated));
+        saveSettingsToFirestore(updated, currentUser?.email || 'admin@wadaage.app');
+        fetch('/api/db/pricing-configs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updated),
+        }).catch(() => {});
+      } catch (_e) {}
+
+      return updated;
+    });
+  }, [currentUser]);
 
   // Admin Driver Approval
   const approveDriver = (driverId: string) => {
@@ -6570,6 +6656,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
         getDriverCoordinates,
         getDispatchRadiusKm,
         isOrderWithinDriverDispatchRadius,
+        setDispatchRadius,
         validateWadaageMatch,
         registerRider,
         updateUserPassword,

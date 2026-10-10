@@ -45,6 +45,7 @@ export const ActiveRideCard: React.FC<ActiveRideCardProps> = ({ onOpenSafetyModa
     unreadChatCount,
     language,
     t,
+    getDispatchRadiusKm,
     isMeterRunning,
     meterKm,
     meterSeconds,
@@ -128,7 +129,9 @@ export const ActiveRideCard: React.FC<ActiveRideCardProps> = ({ onOpenSafetyModa
                 {language === 'so' ? 'Raadinta Darawalka Kuugu Dhow...' : 'Searching for Nearby Drivers...'}
               </h3>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                {language === 'so' ? 'Waxa laguu dirayaa darawallada Hargeysa' : 'Connecting to closest captain in Hargeisa'}
+                {language === 'so'
+                  ? `Darawallada ku sugan goobta ≤ ${getDispatchRadiusKm(currentRide.category)} km`
+                  : `Connecting to captains within ≤ ${getDispatchRadiusKm(currentRide.category)} km radius`}
               </p>
             </div>
           </div>
