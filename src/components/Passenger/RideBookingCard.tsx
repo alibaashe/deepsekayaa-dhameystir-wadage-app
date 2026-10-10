@@ -144,7 +144,7 @@ export const RideBookingCard: React.FC<RideBookingCardProps> = ({
     [roadDurationMins, distanceKm]
   );
 
-  const categories: VehicleCategory[] = ['wadaage_share', 'wadaage_taxi'];
+  const categories: VehicleCategory[] = ['wadaage_taxi'];
 
   const getCategoryIcon = (cat: VehicleCategory) => {
     switch (cat) {

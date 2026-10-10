@@ -3105,6 +3105,13 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (_err) {
           // ignore
         }
+      } else if (e.key === 'wadaage_current_ride') {
+        try {
+          const parsed = safeJsonParse(e.newValue, null);
+          if (role === 'passenger') {
+            setCurrentRide(parsed);
+          }
+        } catch (_err) {}
       }
     };
     window.addEventListener('storage', handleStorageEvent);
@@ -4747,9 +4754,9 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Cancel Ride - Instant clean reset with idempotency guard
   const cancelRide = () => {
     if (currentRide) {
-      // Rule: When ride is in progress and rider is inside car, neither rider nor driver can cancel
-      if (currentRide.status === 'in_progress') {
-        console.warn('[RideContext] Ride is already in progress (rider inside car); cancellation is disabled.');
+      // Rule: Once ride is accepted, driver_arrived, or in_progress, neither rider nor driver can cancel
+      if (currentRide.status !== 'searching') {
+        console.warn('[RideContext] Ride is already accepted or in progress; cancellation is disabled on both sides.');
         return;
       }
 
@@ -4970,18 +4977,21 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Register a Real Driver (saved with pending verification for Admin review)
-  const registerDriver = (driverData: {
-    name: string;
-    phone: string;
+  const registerDriver = (driverData?: {
+    name?: string;
+    phone?: string;
     password?: string;
-    vehicleCategory: VehicleCategory;
+    vehicleCategory?: VehicleCategory;
     vehicleModel?: string;
     licensePlate?: string;
     vehicleColor?: string;
     autoApprove?: boolean;
   }): { driver: Driver; user: AuthUser; application: DriverApplication } => {
-    const cleanPhone = driverData.phone.replace(/\D/g, '');
-    const isAutoApproved = driverData.autoApprove !== undefined ? !!driverData.autoApprove : false;
+    const safeData = driverData || {};
+    const driverName = (safeData.name || 'Wadaage Driver').trim();
+    const driverPhone = safeData.phone || '+252 63 0000000';
+    const cleanPhone = driverPhone.replace(/\D/g, '');
+    const isAutoApproved = safeData.autoApprove !== undefined ? !!safeData.autoApprove : false;
     const generateUniquePassword = () => {
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
       let res = 'Wad#';
@@ -4990,13 +5000,13 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       return res + Math.floor(10 + Math.random() * 90);
     };
-    const driverPassword = driverData.password?.trim() || generateUniquePassword();
+    const driverPassword = safeData.password?.trim() || generateUniquePassword();
 
     const newDriverUser: AuthUser = {
       id: `drv_${Date.now()}`,
-      name: driverData.name.trim(),
+      name: driverName,
       email: `${cleanPhone}@wadaage.com`,
-      phone: driverData.phone,
+      phone: driverPhone,
       password: driverPassword,
       role: 'driver',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
@@ -5030,8 +5040,8 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const newDriver: Driver = {
       id: newDriverUser.id,
-      name: driverData.name.trim(),
-      phone: driverData.phone,
+      name: driverName,
+      phone: driverPhone,
       password: driverPassword,
       avatar: newDriverUser.avatar,
       gender: 'male',
@@ -5052,10 +5062,10 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
         lng: 44.065 + (Math.random() - 0.5) * 0.015,
       },
       vehicle: {
-        model: driverData.vehicleModel || 'Toyota Vitz',
-        licensePlate: driverData.licensePlate || `SL-${Math.floor(10000 + Math.random() * 90000)}`,
-        color: driverData.vehicleColor || 'White',
-        category: driverData.vehicleCategory || 'wadaage_taxi',
+        model: safeData.vehicleModel || 'Toyota Vitz',
+        licensePlate: safeData.licensePlate || `SL-${Math.floor(10000 + Math.random() * 90000)}`,
+        color: safeData.vehicleColor || 'White',
+        category: safeData.vehicleCategory || 'wadaage_taxi',
         capacity: 4,
         photoUrl: 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=300&auto=format&fit=crop&q=80',
       },
@@ -5067,15 +5077,15 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Add driver to drivers state
     setDrivers((prev) => {
-      const filtered = prev.filter((d) => d.phone !== driverData.phone && d.id !== newDriver.id);
+      const filtered = prev.filter((d) => d.phone !== driverPhone && d.id !== newDriver.id);
       return [newDriver, ...filtered];
     });
 
     // Create matching application entry for Admin Review
     const newApp: DriverApplication = {
       id: `app_${Date.now()}`,
-      fullName: driverData.name.trim(),
-      phone: driverData.phone,
+      fullName: driverName,
+      phone: driverPhone,
       password: driverPassword,
       address: 'Hargeisa, Somaliland',
       somalilandIdNumber: `SL-ID-${Math.floor(100000 + Math.random() * 900000)}`,
@@ -5085,15 +5095,15 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
       driverPhoto: newDriverUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
       guarantor: {
         fullName: 'Responsible Guarantor',
-        phone: driverData.phone,
+        phone: driverPhone,
         relationship: 'Guarantor / Dammaanad-qaade',
         address: 'Hargeisa, Somaliland',
       },
       vehicle: {
-        category: driverData.vehicleCategory || 'wadaage_taxi',
-        model: driverData.vehicleModel || 'Toyota Vitz',
-        color: driverData.vehicleColor || 'White',
-        licensePlate: driverData.licensePlate || `SL-${Math.floor(10000 + Math.random() * 90000)}`,
+        category: safeData.vehicleCategory || 'wadaage_taxi',
+        model: safeData.vehicleModel || 'Toyota Vitz',
+        color: safeData.vehicleColor || 'White',
+        licensePlate: safeData.licensePlate || `SL-${Math.floor(10000 + Math.random() * 90000)}`,
         photoUrl: 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=300&auto=format&fit=crop&q=80',
       },
       status: isAutoApproved ? 'approved' : 'pending',
@@ -5102,7 +5112,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
       adminNote: isAutoApproved ? 'Instant Approved' : 'Submitted via Driver Registration Form - Pending Admin Review',
     };
 
-    setDriverApplications((prev) => [newApp, ...prev.filter((a) => a.phone !== driverData.phone)]);
+    setDriverApplications((prev) => [newApp, ...prev.filter((a) => a.phone !== driverPhone)]);
 
     // Save driver and user to Database, Firestore & Hostinger in background
     try {

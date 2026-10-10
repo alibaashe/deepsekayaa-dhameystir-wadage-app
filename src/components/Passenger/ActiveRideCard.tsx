@@ -165,15 +165,17 @@ export const ActiveRideCard: React.FC<ActiveRideCardProps> = ({ onOpenSafetyModa
           <div className="bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-600 h-full rounded-full animate-pulse w-3/4" />
         </div>
 
-        {/* Cancel Button */}
-        <button
-          type="button"
-          onClick={() => setShowCancelModal(true)}
-          className="w-full py-2.5 bg-slate-100 hover:bg-rose-50 dark:bg-slate-800 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-bold rounded-xl text-xs transition active:scale-95 cursor-pointer touch-manipulation flex items-center justify-center space-x-1 border border-slate-200/60 dark:border-slate-700"
-        >
-          <X className="w-3.5 h-3.5" />
-          <span>{language === 'so' ? 'Baaji Raadinta (Cancel)' : 'Cancel Search'}</span>
-        </button>
+        {/* Cancel Button (Only during searching) */}
+        {(currentRide.status as string) === 'searching' && (
+          <button
+            type="button"
+            onClick={() => setShowCancelModal(true)}
+            className="w-full py-2.5 bg-slate-100 hover:bg-rose-50 dark:bg-slate-800 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-bold rounded-xl text-xs transition active:scale-95 cursor-pointer touch-manipulation flex items-center justify-center space-x-1 border border-slate-200/60 dark:border-slate-700"
+          >
+            <X className="w-3.5 h-3.5" />
+            <span>{language === 'so' ? 'Baaji Raadinta (Cancel)' : 'Cancel Search'}</span>
+          </button>
+        )}
 
         {showCancelModal && (
           <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -644,8 +646,8 @@ export const ActiveRideCard: React.FC<ActiveRideCardProps> = ({ onOpenSafetyModa
                 })()}
               </div>
 
-              {/* Cancel Button (Only if not yet in_progress) */}
-              {currentRide.status !== 'in_progress' && (
+              {/* Cancel Button (Only if searching) */}
+              {(currentRide.status as string) === 'searching' && (
                 <div className="text-center pt-1">
                   <button
                     type="button"

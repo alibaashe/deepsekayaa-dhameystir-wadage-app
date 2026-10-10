@@ -1500,15 +1500,17 @@ export const MobileDriverApp: React.FC = () => {
                     <span>GPS</span>
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setShowTransferModal(true)}
-                    className="py-2 px-1 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-bold text-[11px] flex items-center justify-center space-x-1 transition active:scale-95 border border-amber-200 dark:border-amber-800 cursor-pointer"
-                    title="Wareeji / Transfer Ride"
-                  >
-                    <RotateCw className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Wareeji</span>
-                  </button>
+                  {currentRide.status === 'accepted' && (
+                    <button
+                      type="button"
+                      onClick={() => setShowTransferModal(true)}
+                      className="py-2 px-1 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-bold text-[11px] flex items-center justify-center space-x-1 transition active:scale-95 border border-amber-200 dark:border-amber-800 cursor-pointer"
+                      title="Wareeji / Transfer Ride"
+                    >
+                      <RotateCw className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Wareeji</span>
+                    </button>
+                  )}
 
                   <button
                     type="button"
@@ -1628,26 +1630,6 @@ export const MobileDriverApp: React.FC = () => {
                             <span className="text-emerald-400">🚗 Real-Time Odometer</span>
                             <span className="font-mono font-black text-amber-400">{Number(liveMeterKm || 0).toFixed(2)} KM driven</span>
                           </div>
-
-                          {/* Wadaage Share: Match 2nd Passenger Along Corridor */}
-                          {currentRide.isShared && !currentRide.coPassenger && !currentRide.stackedRide && (
-                            <div className="p-2 bg-gradient-to-r from-emerald-950/80 to-teal-950/80 border border-emerald-500/40 rounded-xl flex items-center justify-between text-white text-xs">
-                              <div className="flex items-center space-x-1.5 min-w-0">
-                                <Users className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                                <div className="truncate">
-                                  <div className="font-extrabold text-[10.5px] text-emerald-300">Wadaage Share (Carpool)</div>
-                                  <div className="text-[9px] text-slate-300">Match 2nd rider on your route</div>
-                                </div>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => orderSecondRiderForWadaageShare()}
-                                className="py-1 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[10px] transition cursor-pointer active:scale-95 shadow shrink-0"
-                              >
-                                👥 Match Rider B
-                              </button>
-                            </div>
-                          )}
 
                           {currentRide.isLiveTaximeter && (
                             <div className={`text-[9.5px] font-bold rounded-lg px-2 py-1 border ${
