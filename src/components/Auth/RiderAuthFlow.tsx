@@ -449,7 +449,7 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
               type="button"
               onClick={() => {
                 setErrorMessage(null);
-                setStep('signIn');
+                setStep('signin');
               }}
               className="mt-2.5 w-full py-2 px-3 bg-[#0066FF] hover:bg-[#0052CC] active:scale-95 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow transition cursor-pointer"
             >
