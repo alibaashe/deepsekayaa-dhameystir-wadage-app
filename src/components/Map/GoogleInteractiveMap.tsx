@@ -314,6 +314,15 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
         }
       });
 
+      gMap.addListener('bounds_changed', () => {
+        if (overlayRef.current) {
+          const projection = overlayRef.current.getProjection();
+          if (projection) {
+            setOverlayProjection(projection);
+          }
+        }
+      });
+
       gMap.addListener('click', (e: google.maps.MapMouseEvent) => {
         if (e.latLng) {
           handleLocationSelect(e.latLng.lat(), e.latLng.lng());
@@ -703,13 +712,15 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     }
   };
 
-  // Nearby drivers to render on map (filtered within viewport and deduplicated by id)
+  // Nearby drivers to render on map (filtered for ONLY available cars or assigned active driver)
   const visibleDrivers = useMemo(() => {
     const list = (drivers || []).filter((d) => {
       const lat = d.currentLocation?.lat ?? (d as any).lat;
       const lng = d.currentLocation?.lng ?? (d as any).lng;
       if (!lat || !lng) return false;
-      return d.status !== 'offline';
+      const isAssigned = currentRide?.assignedDriverId === d.id;
+      const isAvailable = d.status === 'available';
+      return isAvailable || isAssigned;
     });
     const seen = new Set<string>();
     return list.filter((d) => {
@@ -717,7 +728,7 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
       seen.add(d.id);
       return true;
     });
-  }, [drivers]);
+  }, [drivers, currentRide?.assignedDriverId]);
 
   return (
     <div
@@ -825,28 +836,9 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
         )}
       </svg>
 
-      {/* 4. Real Interactive Markers Layer (Drivers, Pickup, Destination, City Places) */}
+      {/* 4. Real Interactive Markers Layer (Drivers, Pickup, Destination) */}
       <div className="absolute inset-0 pointer-events-none z-20">
-        {/* Prominent Hargeisa City Places & Landmarks */}
-        {visibleCityPlaces.map((p) => (
-          <div
-            key={p.id}
-            onClick={(e) => {
-              e.stopPropagation();
-              handleLocationSelect(p.lat, p.lng);
-            }}
-            className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-auto cursor-pointer group transition-all hover:scale-110 active:scale-95 z-20"
-            style={{ left: `${p.x}px`, top: `${p.y}px` }}
-            title={`${p.name} - Guji si aad u doorato goobtan`}
-          >
-            <div className="flex items-center space-x-1 px-2 py-0.5 rounded-full bg-white/95 dark:bg-slate-900/95 shadow-md border border-slate-200/90 dark:border-slate-700/90 backdrop-blur-xs text-[10px] font-bold text-slate-800 dark:text-slate-100 group-hover:bg-blue-50 group-hover:text-blue-700 group-hover:border-blue-300">
-              <span className="text-xs">{p.icon}</span>
-              <span className="truncate max-w-[120px]">{p.name.split(' (')[0]}</span>
-            </div>
-          </div>
-        ))}
-
-        {/* Nearby Active Wadaage Fleet Drivers in Hargeisa */}
+        {/* Nearby Available Wadaage Fleet Drivers in Hargeisa (displaying only car graphics, no driver name labels) */}
         {visibleDrivers.map((driver, idx) => {
           const lat = driver.currentLocation?.lat ?? (driver as any).lat;
           const lng = driver.currentLocation?.lng ?? (driver as any).lng;
@@ -867,7 +859,7 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
                 driverName={driver.name}
                 heading={driver.currentHeading || 0}
                 isAssigned={isAssigned}
-                showDetails={isAssigned}
+                showDetails={false}
                 size={isAssigned ? 'md' : 'sm'}
               />
             </div>
