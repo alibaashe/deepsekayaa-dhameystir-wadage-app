@@ -1267,38 +1267,11 @@ export const MobileDriverApp: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Real-time road driving step buttons in mini map HUD */}
+                {/* Real-time road driving KM counter */}
                 {currentRide.status === 'in_progress' && (
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <button
-                      type="button"
-                      onClick={handleDriveRoadStep}
-                      className="py-2 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-black text-[10.5px] border border-slate-700 flex items-center justify-center space-x-1 transition cursor-pointer shadow"
-                    >
-                      <Zap className="w-3 h-3 text-amber-400" />
-                      <span>🚗 Tallaabo (+Step)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleToggleAutoDriving}
-                      className={`py-2 px-2 rounded-xl text-white font-black text-[10.5px] border flex items-center justify-center space-x-1 transition cursor-pointer shadow active:scale-95 ${
-                        isAutoDriving
-                          ? 'bg-amber-600 hover:bg-amber-700 border-amber-400 text-white animate-pulse'
-                          : 'bg-[#008751] hover:bg-[#007445] border-emerald-400/50 text-white'
-                      }`}
-                    >
-                      {isAutoDriving ? (
-                        <>
-                          <Pause className="w-3 h-3 text-white" />
-                          <span>⏸️ Jooji</span>
-                        </>
-                      ) : (
-                        <>
-                          <Play className="w-3 h-3 text-emerald-200" />
-                          <span>▶️ Wad Toos Ah</span>
-                        </>
-                      )}
-                    </button>
+                  <div className="p-2 rounded-xl bg-slate-900 text-white text-[11px] font-bold flex items-center justify-between border border-slate-700">
+                    <span className="text-emerald-400">🚗 Real-Time Odometer</span>
+                    <span className="font-mono font-black text-amber-400">{Number(liveMeterKm || 0).toFixed(2)} KM driven</span>
                   </div>
                 )}
 
@@ -1650,39 +1623,10 @@ export const MobileDriverApp: React.FC = () => {
                             <span>Extra KM: +7,000 SLSH/km</span>
                           </div>
 
-                          {/* Real-Time Road Driving Controls (Tallaabo kasta / Real Road Step) */}
-                          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800/80">
-                            <button
-                              type="button"
-                              onClick={handleDriveRoadStep}
-                              className="py-2.5 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-black text-[11px] border border-slate-700 flex items-center justify-center space-x-1.5 transition cursor-pointer shadow"
-                              title="Advance vehicle to next real road coordinate node and add KM to meter"
-                            >
-                              <Zap className="w-3.5 h-3.5 text-amber-400" />
-                              <span>🚗 Tallaabo (+Road Step)</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleToggleAutoDriving}
-                              className={`py-2.5 px-2 rounded-xl text-white font-black text-[11px] border flex items-center justify-center space-x-1.5 transition cursor-pointer shadow active:scale-95 ${
-                                isAutoDriving
-                                  ? 'bg-amber-600 hover:bg-amber-700 border-amber-400 text-white animate-pulse'
-                                  : 'bg-[#008751] hover:bg-[#007445] border-emerald-400/50 text-white'
-                              }`}
-                              title={isAutoDriving ? 'Stop simulated driving to let standing meter accumulate' : 'Start auto real-time road driving simulation'}
-                            >
-                              {isAutoDriving ? (
-                                <>
-                                  <Pause className="w-3.5 h-3.5 text-white" />
-                                  <span>⏸️ Jooji (Taagan)</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Play className="w-3.5 h-3.5 text-emerald-200" />
-                                  <span>▶️ Wad Toos Ah</span>
-                                </>
-                              )}
-                            </button>
+                          {/* Real-time road driving KM counter display */}
+                          <div className="p-2 rounded-xl bg-slate-900 text-white text-[11px] font-bold flex items-center justify-between border border-slate-700">
+                            <span className="text-emerald-400">🚗 Real-Time Odometer</span>
+                            <span className="font-mono font-black text-amber-400">{Number(liveMeterKm || 0).toFixed(2)} KM driven</span>
                           </div>
 
                           {/* Wadaage Share: Match 2nd Passenger Along Corridor */}

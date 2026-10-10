@@ -52,34 +52,8 @@ export const RealisticVehicleMarker: React.FC<RealisticVehicleMarkerProps> = ({
         </div>
       )}
 
-      {/* Floating Info Badge (For Assigned Driver or Admin View) */}
-      {showDetails && (
-        <div className="mb-1.5 flex flex-col items-center z-30 animate-in fade-in zoom-in-95 duration-200">
-          <div
-            className={`px-2 py-0.5 rounded-lg shadow-xl text-[10px] font-black border flex items-center gap-1 whitespace-nowrap ${
-              isAssigned
-                ? 'bg-slate-950 text-white border-emerald-400 shadow-emerald-500/20'
-                : 'bg-slate-900/90 text-slate-100 border-slate-700'
-            }`}
-          >
-            {isAssigned && (
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block" />
-            )}
-            <span
-              className="w-2 h-2 rounded-full inline-block border border-black/30 shadow-xs"
-              style={{ backgroundColor: colorDef.hex }}
-            />
-            <span>{driverName ? driverName.split(' ')[0] : 'Driver'}</span>
-            <span className="text-slate-400 font-semibold">•</span>
-            <span className="text-emerald-400 font-extrabold">{model.split(' ')[1] || model.split(' ')[0]}</span>
-            {licensePlate && (
-              <span className="text-slate-300 font-mono text-[9px] bg-slate-800 px-1 py-0.2 rounded border border-slate-700">
-                {licensePlate}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Floating Info Badge removed as requested: only car graphic is displayed */}
+      {false && showDetails && null}
 
       {/* Target Halo Glow for Live Active Driver */}
       {isAssigned && (
