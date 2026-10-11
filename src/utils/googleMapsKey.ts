@@ -26,5 +26,5 @@ export function getGoogleMapsApiKey(): string {
     // Ignore process error if unavailable
   }
 
-  return 'AIzaSyBAOVGm7NLFbVZdx2GCsn5_YjdYQVry_4w';
+  return '';
 }

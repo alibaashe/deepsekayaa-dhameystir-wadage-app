@@ -21,20 +21,12 @@ interface GoogleInteractiveMapProps {
   onModeChange?: (mode: 'pickup' | 'dropoff') => void;
 }
 
-// Clean, ultra-minimal Google Maps styling (No POI or place name labels, optimized for car tracking)
+// Clean, modern Google Maps styling with visible place & road labels
 const CLEAN_GOOGLE_MAP_STYLES: google.maps.MapTypeStyle[] = [
   {
     featureType: 'poi',
-    stylers: [{ visibility: 'off' }],
-  },
-  {
-    featureType: 'transit',
-    stylers: [{ visibility: 'off' }],
-  },
-  {
-    featureType: 'administrative',
-    elementType: 'labels',
-    stylers: [{ visibility: 'off' }],
+    elementType: 'labels.text',
+    stylers: [{ visibility: 'on' }],
   },
   {
     featureType: 'road',
@@ -58,12 +50,11 @@ const CLEAN_GOOGLE_MAP_STYLES: google.maps.MapTypeStyle[] = [
   },
 ];
 
-// Dark theme map styling for night mode (Clean without clutter text)
+// Dark theme map styling for night mode with clear place names
 const DARK_GOOGLE_MAP_STYLES: google.maps.MapTypeStyle[] = [
   { elementType: 'geometry', stylers: [{ color: '#1d2c4d' }] },
-  { elementType: 'labels', stylers: [{ visibility: 'off' }] },
-  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#8ec3b9' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#1a3646' }] },
   {
     featureType: 'road',
     elementType: 'geometry',
@@ -171,7 +162,7 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
   const mapDomRef = useRef<HTMLDivElement>(null);
   const googleMapInstanceRef = useRef<google.maps.Map | null>(null);
   const trafficLayerRef = useRef<google.maps.TrafficLayer | null>(null);
-  const heatmapLayerRef = useRef<google.maps.visualization.HeatmapLayer | null>(null);
+  const heatmapLayerRef = useRef<any | null>(null);
   const overlayRef = useRef<google.maps.OverlayView | null>(null);
   const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
 
@@ -305,7 +296,7 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
         if (e.latLng) handleLocationSelect(e.latLng.lat(), e.latLng.lng());
       });
 
-      const overlay = new google.maps.OverlayView();
+      const overlay = new (google.maps.OverlayView as any)();
       overlay.onAdd = function () {};
       overlay.draw = function () {
         const projection = overlay.getProjection();
@@ -363,11 +354,14 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
           new google.maps.LatLng(9.5822, 44.0450), // Mansoor
           new google.maps.LatLng(9.5167, 44.0889), // Airport
         ];
-        heatmapLayerRef.current = new google.maps.visualization.HeatmapLayer({
-          data: hotPoints,
-          radius: 35,
-          opacity: 0.7,
-        });
+        const HeatmapLayerClass = (google.maps.visualization as any).HeatmapLayer;
+        if (HeatmapLayerClass) {
+          heatmapLayerRef.current = new HeatmapLayerClass({
+            data: hotPoints,
+            radius: 35,
+            opacity: 0.7,
+          });
+        }
       }
       heatmapLayerRef.current.setMap(gMap);
     } else if (heatmapLayerRef.current) {
@@ -529,6 +523,28 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     },
     [overlayProjection, center.lat, center.lng, zoom, dimensions.width, dimensions.height]
   );
+
+  // Notable Places & Landmarks in Hargeisa
+  const HARGEISA_NOTABLE_PLACES = useMemo(() => [
+    { id: 'place_airport', name: 'Cigaal Airport', lat: 9.5167, lng: 44.0889, icon: '✈️' },
+    { id: 'place_mig', name: 'Taallada MiG', lat: 9.5598, lng: 44.0673, icon: '🏛️' },
+    { id: 'place_suuq', name: 'Suuqa Waaheen', lat: 9.5620, lng: 44.0645, icon: '🛍️' },
+    { id: 'place_dahabshiil', name: 'Dahabshiil HQ', lat: 9.5615, lng: 44.0682, icon: '🏦' },
+    { id: 'place_telesom', name: 'Telesom HQ', lat: 9.5585, lng: 44.0640, icon: '📱' },
+    { id: 'place_uoh', name: 'Jaamacadda Hargeysa', lat: 9.5512, lng: 44.0585, icon: '🎓' },
+    { id: 'place_edna', name: 'Edna Adan Hospital', lat: 9.5543, lng: 44.0678, icon: '🏥' },
+    { id: 'place_mansoor', name: 'Mansoor Hotel', lat: 9.5822, lng: 44.0450, icon: '🏨' },
+    { id: 'place_ambassador', name: 'Ambassador Hotel', lat: 9.5255, lng: 44.0845, icon: '🏨' },
+    { id: 'place_jigjigayar', name: 'Jigjiga Yar', lat: 9.5700, lng: 44.0750, icon: '📍' },
+    { id: 'place_shacabka', name: 'Bada Cas / Shaabka', lat: 9.5570, lng: 44.0610, icon: '📍' },
+  ], []);
+
+  const visibleCityPlaces = useMemo(() => {
+    return HARGEISA_NOTABLE_PLACES.map((p) => {
+      const pt = toScreenCoord(p.lat, p.lng);
+      return { ...p, x: pt.x, y: pt.y };
+    }).filter((p) => p.x >= -60 && p.x <= dimensions.width + 60 && p.y >= -60 && p.y <= dimensions.height + 60);
+  }, [HARGEISA_NOTABLE_PLACES, toScreenCoord, dimensions.width, dimensions.height]);
 
   // Fallback Route Path Points
   const routePoints = useMemo(() => {
@@ -835,6 +851,24 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
 
       {/* 4. Real-Time Vehicle Markers & Pick/Drop Beacons */}
       <div className="absolute inset-0 pointer-events-none z-20">
+        {/* Hargeisa Places & Location Landmarks Badges */}
+        {visibleCityPlaces.map((p) => (
+          <div
+            key={p.id}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleLocationSelect(p.lat, p.lng);
+            }}
+            className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-auto cursor-pointer group transition-all hover:scale-110 active:scale-95 z-20"
+            style={{ left: `${p.x}px`, top: `${p.y}px` }}
+            title={p.name}
+          >
+            <div className="flex items-center space-x-1 px-2 py-0.5 rounded-full bg-white/95 dark:bg-slate-900/95 shadow-md border border-slate-200/90 dark:border-slate-700/90 backdrop-blur-xs text-[10px] font-bold text-slate-800 dark:text-slate-100 group-hover:bg-blue-50 group-hover:text-blue-700 group-hover:border-blue-300">
+              <span className="text-xs">{p.icon}</span>
+              <span className="truncate max-w-[110px]">{p.name}</span>
+            </div>
+          </div>
+        ))}
         {/* Nearby Active Wadaage Fleet Cars showing Status (Available / Busy) */}
         {visibleDrivers.map((driver, idx) => {
           const lat = driver.currentLocation?.lat ?? (driver as any).lat;
