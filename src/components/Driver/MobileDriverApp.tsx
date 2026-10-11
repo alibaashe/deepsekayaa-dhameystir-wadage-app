@@ -2759,8 +2759,15 @@ export const MobileDriverApp: React.FC = () => {
                   {currentUser?.name?.charAt(0) || 'D'}
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-white">{currentUser?.name || 'Baashe Maxamed'}</h3>
-                  <p className="text-xs text-emerald-400 font-bold">Toyota Vitz (SL-4921)</p>
+                  <h3 className="font-bold text-sm text-white">{currentUser?.name || 'Driver Partner'}</h3>
+                  <p className="text-xs text-emerald-400 font-bold">
+                    {(() => {
+                      const currentDriverObj = drivers.find((d) => d.id === currentUser?.id || (currentUser?.phone && d.phone === currentUser?.phone));
+                      const model = currentDriverObj?.vehicle?.model || 'Toyota Vitz';
+                      const plate = currentDriverObj?.vehicle?.licensePlate || '';
+                      return plate ? `${model} (${plate})` : model;
+                    })()}
+                  </p>
                 </div>
               </div>
 

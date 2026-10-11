@@ -4,12 +4,14 @@ import { HARGEISA_PLACES } from './hargeisaPlaces';
 export const INITIAL_REGISTERED_USERS: AuthUser[] = [
   {
     id: 'usr_admin_baashe',
-    name: 'Baashe (Super Admin)',
-    email: 'baashe2002@gmail.com',
+    name: 'Super Admin',
+    email: 'admin@wadaage.com',
     phone: '+252 63 6807814',
     role: 'admin',
     password: 'password123',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200',
+    walletBalanceUsd: 0.00,
+    wallet_balance_usd: 0.00,
   },
 ];
 

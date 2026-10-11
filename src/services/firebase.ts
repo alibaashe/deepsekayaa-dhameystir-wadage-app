@@ -1248,14 +1248,14 @@ export async function resetFirebaseUserDatabase(): Promise<{
 
     deletedUsersCount = await batchDeleteFirestoreDocs(usersToDeleteRefs);
 
-    // Ensure Super Admin Baashe is anchored and intact in Firestore
+    // Ensure Super Admin is anchored and intact in Firestore
     await setDoc(
       doc(db, 'users', 'usr_admin_baashe'),
       {
         id: 'usr_admin_baashe',
-        name: 'Baashe (Super Admin)',
+        name: 'Super Admin',
         role: 'admin',
-        email: 'baashe2002@gmail.com',
+        email: 'admin@wadaage.com',
         phone: '+252 63 6807814',
         status: 'Active',
         createdAt: new Date().toISOString(),
@@ -1275,8 +1275,8 @@ export async function resetFirebaseUserDatabase(): Promise<{
   try {
     const superAdminObj = {
       id: 'usr_admin_baashe',
-      name: 'Baashe (Super Admin)',
-      email: 'baashe2002@gmail.com',
+      name: 'Super Admin',
+      email: 'admin@wadaage.com',
       phone: '+252 63 6807814',
       role: 'admin',
       status: 'Active',

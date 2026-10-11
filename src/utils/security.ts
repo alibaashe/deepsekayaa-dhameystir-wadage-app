@@ -586,12 +586,7 @@ export function findRegisteredRider(inputPhone: string | undefined | null): any 
       return [];
     })();
 
-    const fallbackRiders = [
-      { id: 'usr_default_1', name: 'Faadumo Jaamac', phone: '634918201', role: 'passenger' },
-      { id: 'usr_default_2', name: 'Cabdi Nuur', phone: '654918201', role: 'passenger' },
-    ];
-
-    const allRiders = [...adminUsers, ...localRegUsers, ...registeredUsers, ...fallbackRiders];
+    const allRiders = [...adminUsers, ...localRegUsers, ...registeredUsers];
 
     return (
       allRiders.find((u) => {

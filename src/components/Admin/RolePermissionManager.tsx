@@ -92,8 +92,8 @@ const DEFAULT_ROLE_PRESETS: Record<AdminRoleType, AdminPermissions> = {
 const INITIAL_STAFF: StaffRole[] = [
   {
     id: 'staff_1',
-    name: 'Baashe (Super Admin)',
-    email: 'baashe2002@gmail.com',
+    name: 'Super Admin',
+    email: 'admin@wadaage.com',
     phone: '+252 63 6807814',
     role: 'Super Admin',
     status: 'Active',

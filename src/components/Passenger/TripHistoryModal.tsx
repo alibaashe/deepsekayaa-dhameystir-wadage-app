@@ -55,7 +55,7 @@ export const TripHistoryModal: React.FC<TripHistoryModalProps> = ({ onClose, onR
       const rPhone = (r.passengerPhone || '').replace(/\D/g, '');
       if (passengerId && r.passengerId === passengerId) return true;
       if (passengerPhone && rPhone && (rPhone.endsWith(passengerPhone) || passengerPhone.endsWith(rPhone))) return true;
-      return !r.passengerId; // platform demo trips
+      return false; // Do not show demo platform trips in production
     });
 
     if (myTrips.length === 0) {
@@ -86,7 +86,7 @@ export const TripHistoryModal: React.FC<TripHistoryModalProps> = ({ onClose, onR
         id: r.id || `WDG-${900 + idx}`,
         date: dateStr,
         categoryName: r.categoryName || (r.service_type === 'Normal' ? 'Normal Taxi' : 'Wadaage Share'),
-        driverName: r.driverName || 'Maxamed Cumar',
+        driverName: r.driverName || 'Driver Partner',
         driverAvatar: r.driverAvatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
         vehiclePlate: r.driverVehiclePlate || 'SL-2044',
         vehicleModel: r.vehicleModel || (r as any).driverVehicleModel || 'Toyota Vitz',

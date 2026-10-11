@@ -768,7 +768,7 @@ Return ONLY valid JSON matching this schema:
       acceptance_rate: Number(req.body.acceptance_rate || existingDriver?.acceptance_rate || 100),
       today_earnings_usd: Number(req.body.todayEarnings || existingDriver?.today_earnings_usd || 0),
       weekly_earnings_usd: Number(req.body.weeklyEarnings || existingDriver?.weekly_earnings_usd || 0),
-      working_capital_usd: 15.0,
+      working_capital_usd: 0.0,
       wallet_balance_usd: Number(req.body.walletBalanceUsd ?? req.body.wallet_balance_usd ?? existingDriver?.wallet_balance_usd ?? existingDriver?.walletBalanceUsd ?? 0),
       walletBalanceUsd: Number(req.body.walletBalanceUsd ?? req.body.wallet_balance_usd ?? existingDriver?.wallet_balance_usd ?? existingDriver?.walletBalanceUsd ?? 0),
       status: req.body.status || existingDriver?.status || 'available',
@@ -1132,6 +1132,28 @@ Return ONLY valid JSON matching this schema:
         client.write(ssePayload);
       } catch (_e) {
         sseClients.delete(client);
+      }
+    }
+
+    // Real-Time SSE Broadcast to passenger/user clients
+    if (tx.user_id || tx.userId) {
+      const uId = tx.user_id || tx.userId;
+      const targetUser = dbService.store.users.find((u: any) => u.id === uId || u.phone === uId);
+      const userPayload = `data: ${JSON.stringify({
+        type: 'USER_WALLET_UPDATED',
+        userId: uId,
+        amountUsd: Number(tx.amountUsd ?? tx.amount_usd ?? 0),
+        newBalanceUsd: targetUser ? targetUser.wallet_balance_usd : undefined,
+        tx,
+        timestamp: Date.now(),
+      })}\n\n`;
+
+      for (const client of sseClients) {
+        try {
+          client.write(userPayload);
+        } catch (_e) {
+          sseClients.delete(client);
+        }
       }
     }
 

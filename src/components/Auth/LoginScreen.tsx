@@ -782,8 +782,8 @@ export const LoginScreen: React.FC = () => {
 
     const adminUser: AuthUser = {
       id: 'super_admin_baashe',
-      name: isAuthorized ? 'Baashe (Super Admin)' : 'Staff Administrator',
-      email: cleanInput.includes('@') ? cleanInput : 'baashe2002@gmail.com',
+      name: isAuthorized ? 'Super Admin' : 'Staff Administrator',
+      email: cleanInput.includes('@') ? cleanInput : 'admin@wadaage.com',
       phone: '+252 63 6807814',
       role: 'admin',
       avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200',

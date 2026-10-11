@@ -135,9 +135,9 @@ const loadPersistedUsers = (drivers: any[], driverApplications: any[]): UserReco
     // 1. Ensure Super Admin is always anchored
     const superAdmin: UserRecord = {
       id: 'usr_admin_baashe',
-      name: 'Baashe (Super Admin)',
+      name: 'Super Admin',
       role: 'Sub-Admin',
-      email: 'baashe2002@gmail.com',
+      email: 'admin@wadaage.com',
       phone: '+252 63 6807814',
       rating: 5.0,
       trips: 0,
@@ -638,14 +638,14 @@ export const UserManagementTable: React.FC = React.memo(() => {
 
           <button
             onClick={async () => {
-              if (window.confirm('Execute Fresh Production Reset? This will wipe all demo drivers, riders, rides, transactions, and reset all wallet balances to $0.00 while strictly preserving Super Admin Baashe.')) {
+              if (window.confirm('Execute Fresh Production Reset? This will wipe all demo drivers, riders, rides, transactions, and reset all wallet balances to $0.00 while preserving Super Admin.')) {
                 setIsPurging(true);
                 await purgeAllFirestoreDemoCollections();
                 const superAdminOnly: UserRecord = {
                   id: 'usr_admin_baashe',
-                  name: 'Baashe (Super Admin)',
+                  name: 'Super Admin',
                   role: 'Sub-Admin',
-                  email: 'baashe2002@gmail.com',
+                  email: 'admin@wadaage.com',
                   phone: '+252 63 6807814',
                   rating: 5.0,
                   trips: 0,

@@ -781,135 +781,117 @@ export const MobilePassengerApp: React.FC = () => {
 
             {/* List of Real Recorded Rides */}
             <div className="space-y-3">
-              {(allPlatformRides && allPlatformRides.length > 0 ? allPlatformRides : [
-                {
-                  id: 'WDG-9481',
-                  categoryName: 'Wadaage Share',
-                  driverName: 'Maxamed Cumar',
-                  driverVehicleModel: 'Toyota Vitz (SL-2044)',
-                  pickup: { name: 'Maan-soor Hotel & Conference Center', address: 'Jigjiga Yar Road, Hargeisa' },
-                  dropoff: { name: 'Egal International Airport (HGA)', address: 'Airport Road, Hargeisa' },
-                  totalFare: 3.50,
-                  status: 'completed',
-                  completedAt: '2026-09-24T08:48:00Z',
-                },
-                {
-                  id: 'WDG-8824',
-                  categoryName: 'Wadaage Share',
-                  driverName: 'Mustafe Cabdi',
-                  driverVehicleModel: 'Toyota Passo (SL-8821)',
-                  pickup: { name: 'University of Hargeisa Campus', address: 'Shaab, Hargeisa' },
-                  dropoff: { name: 'Waheen Central Market', address: 'Downtown Waheen, Hargeisa' },
-                  totalFare: 1.80,
-                  status: 'completed',
-                  completedAt: '2026-09-24T10:24:00Z',
-                },
-                {
-                  id: 'WDG-7105',
-                  categoryName: 'Normal Taxi',
-                  driverName: 'Cali Xasan',
-                  driverVehicleModel: 'Toyota Corolla (SL-1029)',
-                  pickup: { name: 'Edna Adan University Hospital', address: 'Ahmed Dhagax, Hargeisa' },
-                  dropoff: { name: 'Deero Mall Complex', address: 'Jigjiga Yar, Hargeisa' },
-                  totalFare: 3.00,
-                  status: 'completed',
-                  completedAt: '2026-09-24T11:59:00Z',
-                },
-              ]).map((trip: any, idx: number) => {
-                let dateDisplay = 'Maanta';
-                try {
-                  if (trip.completedAt) {
-                    dateDisplay = new Date(trip.completedAt).toLocaleDateString('so-SO', {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    });
-                  } else if (trip.createdAt) {
-                    dateDisplay = new Date(trip.createdAt).toLocaleDateString('so-SO', {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    });
-                  }
-                } catch {}
-
-                const fareUsd = trip.totalFare || 2.50;
-                const fareSlsh = Math.round(fareUsd * 8500);
-
-                return (
-                  <div
-                    key={trip.id || idx}
-                    className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3 hover:border-slate-300 transition"
-                  >
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-8 h-8 rounded-full bg-emerald-50 text-[#008751] flex items-center justify-center font-black text-xs">
-                          ✓
-                        </div>
-                        <div>
-                          <div className="font-bold text-xs text-slate-900">
-                            {trip.driverVehicleModel || trip.categoryName || 'Wadaage Mobility'}
-                          </div>
-                          <div className="text-[10px] text-slate-400 font-mono">
-                            {trip.id} • {dateDisplay}
-                          </div>
-                        </div>
-                      </div>
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                        {trip.status === 'completed' ? (language === 'so' ? 'Dhammaystiran' : 'Completed') : trip.status}
-                      </span>
-                    </div>
-
-                    <div className="text-xs space-y-1.5">
-                      <div className="flex items-start text-slate-600">
-                        <span className="w-2 h-2 rounded-full bg-blue-500 mr-2 shrink-0 mt-1" />
-                        <span className="line-clamp-1">{trip.pickup?.name || trip.pickup?.address || 'Pickup'}</span>
-                      </div>
-                      <div className="flex items-start text-slate-900 font-medium">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2 shrink-0 mt-1" />
-                        <span className="line-clamp-1">{trip.dropoff?.name || trip.dropoff?.address || 'Dropoff'}</span>
-                      </div>
-                    </div>
-
-                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                      <div>
-                        <span className="text-slate-500 text-[11px]">Darawal: </span>
-                        <b className="text-slate-800">{trip.driverName || 'Maxamed Cumar'}</b>
-                      </div>
-                      <div className="text-right">
-                        <span className="font-black text-[#008751]">{fareSlsh.toLocaleString()} SLSH</span>
-                        <span className="text-[10px] text-slate-400 ml-1">(${fareUsd.toFixed(2)})</span>
-                      </div>
-                    </div>
-
-                    {/* Action Buttons: Receipt & Re-book */}
-                    <div className="pt-2 border-t border-dashed border-slate-100 flex items-center justify-end space-x-2">
-                      <button
-                        type="button"
-                        onClick={() => setShowHistoryModal(true)}
-                        className="px-2.5 py-1 text-[11px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center space-x-1 transition"
-                      >
-                        <Receipt className="w-3.5 h-3.5 text-slate-500" />
-                        <span>{language === 'so' ? 'Risidh' : 'Receipt'}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (trip.pickup) setPickupLocation(trip.pickup);
-                          if (trip.dropoff) setDropoffLocation(trip.dropoff);
-                          setActiveTab('dalbo');
-                        }}
-                        className="px-3 py-1 text-[11px] font-black text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg flex items-center space-x-1 transition"
-                      >
-                        <RotateCcw className="w-3 h-3 text-emerald-600" />
-                        <span>{language === 'so' ? 'Mar kale Dalbo' : 'Re-book'}</span>
-                      </button>
-                    </div>
+              {(!allPlatformRides || allPlatformRides.length === 0) ? (
+                <div className="bg-white rounded-2xl p-6 border border-slate-200 text-center space-y-2">
+                  <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto text-xl font-bold">
+                    🚗
                   </div>
-                );
-              })}
+                  <h4 className="font-extrabold text-sm text-slate-800">
+                    {language === 'so' ? 'Wali ma jiro safar la diiwaangeliyay' : 'No recorded rides yet'}
+                  </h4>
+                  <p className="text-xs text-slate-500 max-w-xs mx-auto">
+                    {language === 'so'
+                      ? 'Dalbo safarkaaga koowaad! Dhammaan safarradaada iyo rasiidhadaadu waxay si toos ah uga muuqan doonaan halkan.'
+                      : 'Book your first ride! All your completed and active trips will automatically record and appear here.'}
+                  </p>
+                </div>
+              ) : (
+                allPlatformRides.map((trip: any, idx: number) => {
+                  let dateDisplay = 'Maanta';
+                  try {
+                    if (trip.completedAt) {
+                      dateDisplay = new Date(trip.completedAt).toLocaleDateString('so-SO', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      });
+                    } else if (trip.createdAt) {
+                      dateDisplay = new Date(trip.createdAt).toLocaleDateString('so-SO', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      });
+                    }
+                  } catch {}
+
+                  const fareUsd = trip.totalFare || 2.50;
+                  const fareSlsh = Math.round(fareUsd * 8500);
+
+                  return (
+                    <div
+                      key={trip.id || idx}
+                      className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3 hover:border-slate-300 transition"
+                    >
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-8 h-8 rounded-full bg-emerald-50 text-[#008751] flex items-center justify-center font-black text-xs">
+                            ✓
+                          </div>
+                          <div>
+                            <div className="font-bold text-xs text-slate-900">
+                              {trip.driverVehicleModel || trip.categoryName || 'Wadaage Mobility'}
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-mono">
+                              {trip.id} • {dateDisplay}
+                            </div>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                          {trip.status === 'completed' ? (language === 'so' ? 'Dhammaystiran' : 'Completed') : trip.status}
+                        </span>
+                      </div>
+
+                      <div className="text-xs space-y-1.5">
+                        <div className="flex items-start text-slate-600">
+                          <span className="w-2 h-2 rounded-full bg-blue-500 mr-2 shrink-0 mt-1" />
+                          <span className="line-clamp-1">{trip.pickup?.name || trip.pickup?.address || 'Pickup'}</span>
+                        </div>
+                        <div className="flex items-start text-slate-900 font-medium">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2 shrink-0 mt-1" />
+                          <span className="line-clamp-1">{trip.dropoff?.name || trip.dropoff?.address || 'Dropoff'}</span>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                        <div>
+                          <span className="text-slate-500 text-[11px]">Darawal: </span>
+                          <b className="text-slate-800">{trip.driverName || 'Driver Partner'}</b>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-black text-[#008751]">{fareSlsh.toLocaleString()} SLSH</span>
+                          <span className="text-[10px] text-slate-400 ml-1">(${fareUsd.toFixed(2)})</span>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons: Receipt & Re-book */}
+                      <div className="pt-2 border-t border-dashed border-slate-100 flex items-center justify-end space-x-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowHistoryModal(true)}
+                          className="px-2.5 py-1 text-[11px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center space-x-1 transition"
+                        >
+                          <Receipt className="w-3.5 h-3.5 text-slate-500" />
+                          <span>{language === 'so' ? 'Risidh' : 'Receipt'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (trip.pickup) setPickupLocation(trip.pickup);
+                            if (trip.dropoff) setDropoffLocation(trip.dropoff);
+                            setActiveTab('dalbo');
+                          }}
+                          className="px-3 py-1 text-[11px] font-black text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg flex items-center space-x-1 transition"
+                        >
+                          <RotateCcw className="w-3 h-3 text-emerald-600" />
+                          <span>{language === 'so' ? 'Mar kale Dalbo' : 'Re-book'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         )}
