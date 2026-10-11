@@ -392,52 +392,9 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
       return;
     }
 
-    // A: Direct Password Login
-    if (signInMode === 'password') {
-      const enteredPwd = signInPassword.trim();
-      const validPasswords = [
-        existing.password,
-        '123456',
-        'Wad#123',
-        'password',
-      ].filter(Boolean);
-
-      if (enteredPwd && (!existing.password || enteredPwd === existing.password || validPasswords.includes(enteredPwd))) {
-        setIsLoading(true);
-        setTimeout(() => {
-          setIsLoading(false);
-          const userToLogin = {
-            id: existing.id || `rider_${Date.now()}`,
-            name: existing.name || 'Wadaage Passenger',
-            email: existing.email || `${clean}@wadaage.app`,
-            phone: getFormattedPhone(clean),
-            role: 'passenger' as const,
-            avatar: existing.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-          };
-          login(userToLogin);
-        }, 300);
-        return;
-      } else if (!enteredPwd) {
-        setErrorMessage(
-          language === 'so'
-            ? 'Fadlan geli erayga sirta ah ama u gudub WhatsApp OTP'
-            : 'Please enter your password or switch to WhatsApp OTP'
-        );
-        return;
-      } else {
-        setErrorMessage(
-          language === 'so'
-            ? 'Erayga sirta ah ma saxna. Fadlan dib u hubi ama isticmaal WhatsApp OTP.'
-            : 'Incorrect password. Please try again or switch to WhatsApp OTP.'
-        );
-        return;
-      }
-    }
-
-    // B: WhatsApp OTP Login
+    // Send WhatsApp OTP to registered rider
     setIsLoading(true);
     try {
-      // Send OTP to registered rider
       const res = await sendWhatsAppOtp(clean, 'rider', existing.name || 'Wadaage Rider');
       setIsLoading(false);
       if (res.success) {
@@ -551,11 +508,22 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
       {/* SCREEN 1: WELCOME / ONBOARDING SPLASH ("Safar wadaag, nolol wadaag.") */}
       {/* =================================================================== */}
       {step === 'welcome' && (
-        <div className="w-full flex-1 flex flex-col justify-between relative bg-gradient-to-b from-[#03132B] via-[#07244D] to-[#0A3A78] text-white overflow-hidden">
+        <div className="w-full flex-1 flex flex-col justify-between relative text-white overflow-hidden">
+          {/* Background image matching user's uploaded design (Hargeisa night skyline & Somaliland flag building) */}
+          <div className="absolute inset-0 z-0">
+            <img
+              src="/images/wadaage_hero_hargeisa.jpg"
+              alt="Hargeisa Somaliland Night Skyline"
+              className="w-full h-full object-cover object-center scale-105"
+            />
+            {/* Rich cinematic gradient overlays for pristine readability and gorgeous evening glow */}
+            <div className="absolute inset-0 bg-gradient-to-t from-[#021812]/95 via-[#021812]/70 to-black/50 mix-blend-multiply" />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-[#021812]/95" />
+          </div>
+
           {/* Ambient Lighting Orbs */}
-          <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-96 h-96 bg-[#00E575]/20 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute bottom-16 -right-10 w-72 h-72 bg-[#00A3FF]/25 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute top-1/3 -left-12 w-60 h-60 bg-[#7B2CBF]/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-96 h-96 bg-[#00E575]/15 rounded-full blur-3xl pointer-events-none z-10" />
+          <div className="absolute bottom-16 -right-10 w-72 h-72 bg-[#00A3FF]/20 rounded-full blur-3xl pointer-events-none z-10" />
 
           {/* Top Bar with Location, Language & Role Switcher */}
           <div className="px-5 pt-3 pb-1 flex items-center justify-between z-20">
@@ -1211,7 +1179,18 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
       {/* SCREEN 6: SIGN IN / DIRECT LOGIN FOR EXISTING ACCOUNTS ("Gal") */}
       {/* =================================================================== */}
       {step === 'signin' && (
-        <div className="w-full flex-1 flex flex-col justify-between bg-gradient-to-b from-[#03132B] via-[#07244D] to-[#0A3A78] text-white overflow-y-auto no-scrollbar">
+        <div className="w-full flex-1 flex flex-col justify-between relative text-white overflow-y-auto no-scrollbar">
+          {/* Background image matching user's uploaded design */}
+          <div className="absolute inset-0 z-0">
+            <img
+              src="/images/wadaage_hero_hargeisa.jpg"
+              alt="Hargeisa Somaliland Night Skyline"
+              className="w-full h-full object-cover object-center scale-105"
+            />
+            {/* Rich cinematic gradient overlays */}
+            <div className="absolute inset-0 bg-gradient-to-t from-[#021812]/95 via-[#021812]/75 to-black/55 mix-blend-multiply" />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-[#021812]/95" />
+          </div>
           {/* Top Bar with Back Arrow, Logo & Language */}
           <div className="px-5 pt-3 pb-2 flex items-center justify-between z-10 border-b border-white/10">
             <button
@@ -1250,43 +1229,8 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
               </p>
             </div>
 
-            {/* Mode Switcher Tabs: Password vs WhatsApp OTP */}
-            <div className="p-1 bg-black/40 backdrop-blur-md rounded-2xl border border-white/15 grid grid-cols-2 gap-1 text-xs font-black">
-              <button
-                type="button"
-                onClick={() => {
-                  setSignInMode('password');
-                  setErrorMessage(null);
-                }}
-                className={`py-2 px-3 rounded-xl transition flex items-center justify-center space-x-1.5 cursor-pointer ${
-                  signInMode === 'password'
-                    ? 'bg-[#00E575] text-slate-950 shadow-md font-black'
-                    : 'text-white/80 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <Key className="w-3.5 h-3.5" />
-                <span>Furaha Sirta (Password)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSignInMode('otp');
-                  setErrorMessage(null);
-                }}
-                className={`py-2 px-3 rounded-xl transition flex items-center justify-center space-x-1.5 cursor-pointer ${
-                  signInMode === 'otp'
-                    ? 'bg-[#00E575] text-slate-950 shadow-md font-black'
-                    : 'text-white/80 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <Phone className="w-3.5 h-3.5" />
-                <span>WhatsApp OTP</span>
-              </button>
-            </div>
-
             {/* Sign In Form */}
-            <form onSubmit={handleSignInSubmit} className="space-y-3">
+            <form onSubmit={handleSignInSubmit} className="space-y-4">
               {/* Phone Input Box */}
               <div>
                 <div className="flex items-center justify-between text-[11px] font-bold text-white/90 mb-1">
@@ -1343,76 +1287,18 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
                 </div>
               </div>
 
-              {/* Password Input (Only when password mode is active) */}
-              {signInMode === 'password' && (
-                <div>
-                  <div className="flex items-center justify-between text-[11px] font-bold text-white/90 mb-1">
-                    <span className="flex items-center gap-1">
-                      <Lock className="w-3.5 h-3.5 text-[#00E575]" />
-                      <span>Erayga Sirta ah (Password)</span>
-                    </span>
-                    <span className="text-[10px] text-cyan-200/80">Tusaale: 123456</span>
-                  </div>
-
-                  <div className="relative flex items-center bg-white rounded-2xl px-3 py-2.5 shadow-lg border-2 border-transparent focus-within:border-[#00E575]">
-                    <Lock className="w-4 h-4 text-slate-400 shrink-0 mr-2" />
-                    <input
-                      type={showSignInPassword ? 'text' : 'password'}
-                      value={signInPassword}
-                      onChange={(e) => setSignInPassword(e.target.value)}
-                      placeholder="Geli erayga sirta ah..."
-                      className="w-full text-sm font-sans font-bold text-slate-900 placeholder-slate-400 focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowSignInPassword(!showSignInPassword)}
-                      className="p-1 text-slate-400 hover:text-slate-600 transition"
-                    >
-                      {showSignInPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* One-Tap Quick Test Demo Accounts */}
-              <div className="p-2.5 bg-black/35 backdrop-blur-md rounded-2xl border border-white/15 space-y-1.5">
-                <span className="text-[10px] font-black text-cyan-300 flex items-center gap-1">
-                  <Zap className="w-3 h-3 text-[#00E575]" />
-                  <span>Tijaabi Hadda (One-Tap Instant Test):</span>
-                </span>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickDemoLogin('634918201', 'Faadumo Jaamac')}
-                    className="py-1.5 px-2 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 rounded-xl text-[11px] text-white font-bold text-left flex items-center justify-between transition cursor-pointer"
-                  >
-                    <span>Faadumo (+252 63)</span>
-                    <span className="text-[9px] bg-emerald-500 text-slate-950 font-black px-1.5 py-0.5 rounded-full">GAL</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleQuickDemoLogin('654918201', 'Cabdi Nuur')}
-                    className="py-1.5 px-2 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/40 rounded-xl text-[11px] text-white font-bold text-left flex items-center justify-between transition cursor-pointer"
-                  >
-                    <span>Cabdi (+252 65)</span>
-                    <span className="text-[9px] bg-cyan-400 text-slate-950 font-black px-1.5 py-0.5 rounded-full">GAL</span>
-                  </button>
-                </div>
-              </div>
-
               {/* Submit Button */}
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-[#00E575] hover:bg-[#00D766] active:scale-[0.98] text-slate-950 font-black py-3.5 rounded-full text-base tracking-wide shadow-xl shadow-[#00E575]/35 transition flex items-center justify-center space-x-2 cursor-pointer mt-1"
+                className="w-full bg-[#00E575] hover:bg-[#00D766] active:scale-[0.98] text-slate-950 font-black py-3.5 rounded-full text-base tracking-wide shadow-xl shadow-[#00E575]/35 transition flex items-center justify-center space-x-2 cursor-pointer mt-2"
               >
                 {isLoading ? (
                   <div className="w-5 h-5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <>
-                    <Car className="w-5 h-5" />
-                    <span>{signInMode === 'password' ? 'Gal Akoonka (Sign In)' : 'U Dir Koodhka WhatsApp'}</span>
+                    <Phone className="w-5 h-5" />
+                    <span>U Dir Koodhka WhatsApp</span>
                     <ArrowRight className="w-5 h-5 stroke-[2.5]" />
                   </>
                 )}

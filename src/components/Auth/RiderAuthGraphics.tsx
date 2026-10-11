@@ -438,7 +438,7 @@ export const BottomWaveGradient: React.FC<{ className?: string; height?: number 
 // Features Hargeisa city mountains, waving Somaliland flag, and white branded Wadaage Share car!
 export const HeroHargeisaCarScene: React.FC<{ className?: string }> = ({ className = 'w-full h-48' }) => {
   return (
-    <div className={`relative overflow-hidden rounded-3xl select-none shadow-2xl border border-white/20 group ${className}`}>
+    <div className={`relative overflow-hidden rounded-3xl select-none shadow-2xl border border-white/25 group ${className}`}>
       {/* Background authentic Hargeisa city panoramic photo with rich gradient overlay */}
       <div className="absolute inset-0 z-0">
         <img
@@ -450,56 +450,8 @@ export const HeroHargeisaCarScene: React.FC<{ className?: string }> = ({ classNa
             (e.target as HTMLElement).style.display = 'none';
           }}
         />
-        {/* Cinematic atmospheric overlays: Warm golden sunset to deep Wadaage blue gradient */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#002244]/90 via-[#003B73]/50 to-transparent mix-blend-multiply" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#003B73]/70 via-transparent to-[#001f3f]/60" />
-      </div>
-
-      {/* Floating City Badges (Hargeysa • Naasa Hablood) */}
-      <div className="absolute top-2.5 left-3 z-20 flex items-center space-x-1.5">
-        <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-slate-950/60 backdrop-blur-md border border-white/25 text-white text-[10px] font-extrabold shadow-lg">
-          <span className="w-2 h-2 rounded-full bg-[#00E575] animate-pulse" />
-          <span>Hargeysa • Somaliland</span>
-        </div>
-      </div>
-
-      {/* Somaliland Flag on Flagpole waving on the right */}
-      <div className="absolute top-2.5 right-3.5 z-20 flex flex-col items-start drop-shadow-xl">
-        <div className="w-1 h-16 bg-slate-300 rounded-t-full relative shadow-md">
-          {/* Gold finial ball on top */}
-          <div className="w-2 h-2 rounded-full bg-amber-400 absolute -top-1 -left-0.5 shadow-sm" />
-          {/* Somaliland Waving Flag */}
-          <div className="absolute top-0.5 left-1 w-14 h-9 shadow-xl rounded-xs overflow-hidden border border-black/20 flex flex-col">
-            {/* Green stripe */}
-            <div className="h-3 bg-[#008751] flex items-center justify-center text-[5px] text-white font-bold tracking-tight">
-              لا إله إلا الله
-            </div>
-            {/* White stripe with black 5-pointed star */}
-            <div className="h-3 bg-white flex items-center justify-center text-[8px] text-black font-black leading-none">
-              ★
-            </div>
-            {/* Red stripe */}
-            <div className="h-3 bg-[#D21034]" />
-          </div>
-        </div>
-      </div>
-
-      {/* Road surface with street illumination */}
-      <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-b from-slate-900/90 via-slate-950 to-black border-t border-slate-700/80 z-10">
-        {/* Center Road Dash Markings */}
-        <div className="absolute top-1/2 left-0 right-0 h-0.5 border-b-2 border-dashed border-amber-400/90 -translate-y-1/2" />
-      </div>
-
-      {/* Modern White Branded Toyota Car on Road */}
-      <div className="absolute bottom-1 left-2 sm:left-4 z-30 w-52 sm:w-60 h-28 flex items-end">
-        <img
-          src="/images/car_wadaage_share.jpg"
-          alt="Wadaage Share Car"
-          className="w-full h-full object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)]"
-          onError={(e) => {
-            (e.target as HTMLElement).style.display = 'none';
-          }}
-        />
+        {/* Cinematic atmospheric overlays */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#021812]/80 via-transparent to-transparent mix-blend-multiply" />
       </div>
     </div>
   );
