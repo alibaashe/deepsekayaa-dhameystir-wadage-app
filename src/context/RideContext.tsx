@@ -2471,9 +2471,20 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Helper to check ownership of ride for current logged-in passenger
         const isMyPassengerRide = (r: RideRequest) => {
+          if (!r) return false;
+          const curId = currentRide?.id || currentRideRef.current?.id;
+          if (curId && curId === r.id) return true;
+          try {
+            const saved = localStorage.getItem('wadaage_current_ride');
+            if (saved) {
+              const p = JSON.parse(saved);
+              if (p?.id === r.id) return true;
+            }
+          } catch {}
           if (currentUser?.id && r.passengerId === currentUser.id) return true;
-          if (currentUser?.phone && r.passengerPhone === currentUser.phone) return true;
-          if (currentRide && currentRide.id === r.id) return true;
+          const cleanUserPhone = currentUser?.phone?.replace(/\D/g, '');
+          const cleanRidePhone = r.passengerPhone?.replace(/\D/g, '');
+          if (cleanUserPhone && cleanRidePhone && (cleanUserPhone === cleanRidePhone || cleanUserPhone.endsWith(cleanRidePhone) || cleanRidePhone.endsWith(cleanUserPhone))) return true;
           return false;
         };
 
@@ -2715,16 +2726,30 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const isMyPassengerRide = (r: any) => {
         if (!r) return false;
+        const curId = currentRide?.id || currentRideRef.current?.id;
+        if (curId && curId === r.id) return true;
+        try {
+          const saved = localStorage.getItem('wadaage_current_ride');
+          if (saved) {
+            const p = JSON.parse(saved);
+            if (p?.id === r.id) return true;
+          }
+        } catch {}
         if (currentUser?.id && r.passengerId === currentUser.id) return true;
-        if (currentUser?.phone && r.passengerPhone === currentUser.phone) return true;
-        if (currentRide && currentRide.id === r.id) return true;
+        const cleanUserPhone = currentUser?.phone?.replace(/\D/g, '');
+        const cleanRidePhone = r.passengerPhone?.replace(/\D/g, '');
+        if (cleanUserPhone && cleanRidePhone && (cleanUserPhone === cleanRidePhone || cleanUserPhone.endsWith(cleanRidePhone) || cleanRidePhone.endsWith(cleanUserPhone))) return true;
         return false;
       };
 
       const isMyDriverRide = (r: any) => {
         if (!r) return false;
+        const curId = currentRide?.id || currentRideRef.current?.id;
+        if (curId && curId === r.id) return true;
         if (currentUser?.id && (r.assignedDriverId === currentUser.id || r.assignedDriverId === `drv_${currentUser.id}`)) return true;
-        if (currentUser?.phone && r.driverPhone === currentUser.phone) return true;
+        const cleanUserPhone = currentUser?.phone?.replace(/\D/g, '');
+        const cleanDriverPhone = r.driverPhone?.replace(/\D/g, '');
+        if (cleanUserPhone && cleanDriverPhone && (cleanUserPhone === cleanDriverPhone || cleanUserPhone.endsWith(cleanDriverPhone) || cleanDriverPhone.endsWith(cleanUserPhone))) return true;
         return false;
       };
 

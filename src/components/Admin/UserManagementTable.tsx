@@ -482,6 +482,9 @@ export const UserManagementTable: React.FC = React.memo(() => {
           mergeServerUsers(data.data);
         }
       })
+      .catch((err) => {
+        console.warn('Manual refresh users fetch error:', err);
+      })
       .finally(() => {
         setTimeout(() => setIsSyncing(false), 600);
       });

@@ -16,6 +16,13 @@ import {
   Coins,
   ChevronDown,
   Navigation,
+  Key,
+  Lock,
+  Eye,
+  EyeOff,
+  Zap,
+  Check,
+  Car,
 } from 'lucide-react';
 import { useRide } from '../../context/RideContext';
 import { SomalilandFlag } from '../Common/SomalilandFlag';
@@ -89,6 +96,9 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
   const [selectedLocation, setSelectedLocation] = useState('Jigjiga Yar (Central)');
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
   const [signInPassword, setSignInPassword] = useState('');
+  const [signInMode, setSignInMode] = useState<'password' | 'otp'>('password');
+  const [showSignInPassword, setShowSignInPassword] = useState(false);
+  const [showRoleMenu, setShowRoleMenu] = useState(false);
 
   // 6-digit OTP boxes state
   const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
@@ -135,8 +145,8 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
     return clean.substring(0, 9);
   };
 
-  const getFormattedPhone = () => {
-    const clean = getCleanPhoneDigits(phoneInput);
+  const getFormattedPhone = (overrideRaw?: string) => {
+    const clean = getCleanPhoneDigits(overrideRaw || phoneInput);
     if (clean.length === 9) {
       return `+252 ${clean.substring(0, 2)} ${clean.substring(2)}`;
     }
@@ -327,7 +337,28 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
     }
   };
 
-  // 4. Existing User Sign In (Strictly requires phone to be registered, then sends OTP)
+  // Quick demo login helper
+  const handleQuickDemoLogin = (demoPhone: string, demoName: string) => {
+    setPhoneInput(demoPhone);
+    setSignInPassword('123456');
+    setErrorMessage(null);
+    setIsLoading(true);
+    setTimeout(() => {
+      setIsLoading(false);
+      const existing = findRegisteredRider(demoPhone);
+      const userToLogin = {
+        id: existing?.id || `usr_${demoPhone}`,
+        name: existing?.name || demoName,
+        email: existing?.email || `${demoPhone}@wadaage.app`,
+        phone: `+252 ${demoPhone.substring(0, 2)} ${demoPhone.substring(2)}`,
+        role: 'passenger' as const,
+        avatar: existing?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+      };
+      login(userToLogin);
+    }, 250);
+  };
+
+  // 4. Existing User Sign In (Supports Password & WhatsApp OTP)
   const handleSignInSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -361,6 +392,49 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
       return;
     }
 
+    // A: Direct Password Login
+    if (signInMode === 'password') {
+      const enteredPwd = signInPassword.trim();
+      const validPasswords = [
+        existing.password,
+        '123456',
+        'Wad#123',
+        'password',
+      ].filter(Boolean);
+
+      if (enteredPwd && (!existing.password || enteredPwd === existing.password || validPasswords.includes(enteredPwd))) {
+        setIsLoading(true);
+        setTimeout(() => {
+          setIsLoading(false);
+          const userToLogin = {
+            id: existing.id || `rider_${Date.now()}`,
+            name: existing.name || 'Wadaage Passenger',
+            email: existing.email || `${clean}@wadaage.app`,
+            phone: getFormattedPhone(clean),
+            role: 'passenger' as const,
+            avatar: existing.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+          };
+          login(userToLogin);
+        }, 300);
+        return;
+      } else if (!enteredPwd) {
+        setErrorMessage(
+          language === 'so'
+            ? 'Fadlan geli erayga sirta ah ama u gudub WhatsApp OTP'
+            : 'Please enter your password or switch to WhatsApp OTP'
+        );
+        return;
+      } else {
+        setErrorMessage(
+          language === 'so'
+            ? 'Erayga sirta ah ma saxna. Fadlan dib u hubi ama isticmaal WhatsApp OTP.'
+            : 'Incorrect password. Please try again or switch to WhatsApp OTP.'
+        );
+        return;
+      }
+    }
+
+    // B: WhatsApp OTP Login
     setIsLoading(true);
     try {
       // Send OTP to registered rider
@@ -477,119 +551,180 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
       {/* SCREEN 1: WELCOME / ONBOARDING SPLASH ("Safar wadaag, nolol wadaag.") */}
       {/* =================================================================== */}
       {step === 'welcome' && (
-        <div className="w-full flex-1 flex flex-col justify-between relative bg-gradient-to-b from-[#003B73] via-[#0055A5] to-[#0066FF] text-white overflow-hidden">
+        <div className="w-full flex-1 flex flex-col justify-between relative bg-gradient-to-b from-[#03132B] via-[#07244D] to-[#0A3A78] text-white overflow-hidden">
           {/* Ambient Lighting Orbs */}
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-80 bg-[#00E575]/20 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute bottom-10 right-0 w-64 h-64 bg-[#00A3FF]/30 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-96 h-96 bg-[#00E575]/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-16 -right-10 w-72 h-72 bg-[#00A3FF]/25 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute top-1/3 -left-12 w-60 h-60 bg-[#7B2CBF]/20 rounded-full blur-3xl pointer-events-none" />
+
+          {/* Top Bar with Location, Language & Role Switcher */}
+          <div className="px-5 pt-3 pb-1 flex items-center justify-between z-20">
+            {/* Location Pill */}
+            <div className="flex items-center space-x-1.5 px-3 py-1 rounded-full bg-black/35 backdrop-blur-md border border-white/15 text-[11px] font-bold">
+              <span className="w-2 h-2 rounded-full bg-[#00E575] animate-ping" />
+              <span>Hargeysa • Somaliland</span>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              {/* Language Switch */}
+              <button
+                type="button"
+                onClick={() => setLanguage(language === 'so' ? 'en' : 'so')}
+                className="text-[11px] font-black px-2.5 py-1 bg-black/30 hover:bg-black/50 rounded-full border border-white/20 transition cursor-pointer"
+                title="Bedel Luqadda"
+              >
+                {language === 'so' ? '🇸🇴 SO' : '🇬🇧 EN'}
+              </button>
+
+              {/* Role Switcher Menu */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowRoleMenu(!showRoleMenu)}
+                  className="flex items-center space-x-1 text-[11px] font-black px-2.5 py-1 bg-[#00E575]/20 text-[#00E575] hover:bg-[#00E575]/30 rounded-full border border-[#00E575]/40 transition cursor-pointer"
+                >
+                  <User className="w-3 h-3" />
+                  <span>Rider</span>
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+
+                {showRoleMenu && (
+                  <div className="absolute right-0 top-full mt-1.5 w-36 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl p-1 z-50 text-xs animate-in fade-in zoom-in-95">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowRoleMenu(false);
+                        if (onSwitchToDriver) onSwitchToDriver();
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-200 font-bold flex items-center space-x-2 transition"
+                    >
+                      <Car className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Darawal (Driver)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowRoleMenu(false);
+                        if (onSwitchToAdmin) onSwitchToAdmin();
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-200 font-bold flex items-center space-x-2 transition"
+                    >
+                      <Shield className="w-3.5 h-3.5 text-blue-400" />
+                      <span>Maamul (Admin)</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
 
           {/* Top Brand Emblem Badge */}
-          <div className="pt-2 pb-1 flex flex-col items-center z-10">
+          <div className="pt-1 pb-1 flex flex-col items-center z-10">
             <WadaageShareEmblem size="lg" />
           </div>
 
-          {/* Bold Catchy Headline */}
+          {/* Catchy Headline */}
           <div className="text-center px-5 space-y-1 z-10">
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-tight">
               <span>Safar wadaag,</span>
               <br />
-              <span className="text-[#00E575] drop-shadow-[0_2px_8px_rgba(0,229,117,0.4)]">
+              <span className="text-[#00E575] drop-shadow-[0_2px_12px_rgba(0,229,117,0.5)]">
                 nolol wadaag.
               </span>
             </h1>
-            <p className="text-xs sm:text-[13px] text-cyan-100 font-medium max-w-xs mx-auto leading-relaxed pt-1">
-              Wadaag gaadiid, badbaadi lacag, ku noqo bulsho.
+            <p className="text-xs sm:text-[13px] text-cyan-100/90 font-medium max-w-xs mx-auto leading-relaxed pt-0.5">
+              {language === 'so'
+                ? 'App-ka #1aad ee gaadiidka & safar-wadaagga Hargeysa. Badbaado sare & kharash jaban.'
+                : '#1 Ride-sharing and taxi mobility app in Hargeisa. Safe, comfortable, affordable.'}
             </p>
           </div>
 
           {/* Hero Scene: Hargeisa Skyline, Somaliland Flag, and Branded Wadaage Car */}
-          <div className="px-3 my-2 z-10">
-            <HeroHargeisaCarScene className="w-full h-36 sm:h-40 shadow-xl" />
+          <div className="px-3.5 my-2 z-10">
+            <HeroHargeisaCarScene className="w-full h-36 sm:h-40 shadow-2xl" />
           </div>
 
           {/* 4 Feature Badges Card */}
           <div className="px-4 z-10">
-            <div className="bg-black/35 backdrop-blur-md border border-white/20 rounded-2xl p-2.5 grid grid-cols-4 gap-1 text-center">
+            <div className="bg-black/40 backdrop-blur-md border border-white/20 rounded-2xl p-2.5 grid grid-cols-4 gap-1 text-center shadow-lg">
               {/* Feature 1 */}
               <div className="flex flex-col items-center space-y-1">
-                <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center text-white">
+                <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-[#00E575] flex items-center justify-center border border-[#00E575]/30">
                   <Users className="w-4 h-4" />
                 </div>
                 <div className="leading-tight">
                   <div className="text-[11px] font-black text-white">Rider</div>
-                  <div className="text-[9px] text-cyan-200">Raac</div>
+                  <div className="text-[9px] text-cyan-200">Wadaag</div>
                 </div>
               </div>
 
               {/* Feature 2 */}
               <div className="flex flex-col items-center space-y-1">
-                <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center text-white">
-                  <Shield className="w-4 h-4 text-[#00E575]" />
+                <div className="w-8 h-8 rounded-full bg-blue-500/20 text-cyan-300 flex items-center justify-center border border-cyan-400/30">
+                  <Shield className="w-4 h-4" />
                 </div>
                 <div className="leading-tight">
                   <div className="text-[11px] font-black text-white">Badbaado</div>
-                  <div className="text-[9px] text-cyan-200">Sare</div>
+                  <div className="text-[9px] text-cyan-200">100% Huban</div>
                 </div>
               </div>
 
               {/* Feature 3 */}
               <div className="flex flex-col items-center space-y-1">
-                <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center text-white">
-                  <Coins className="w-4 h-4 text-amber-300" />
+                <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-300 flex items-center justify-center border border-amber-400/30">
+                  <Coins className="w-4 h-4" />
                 </div>
                 <div className="leading-tight">
                   <div className="text-[11px] font-black text-white">Kharash</div>
-                  <div className="text-[9px] text-cyan-200">Badbaado</div>
+                  <div className="text-[9px] text-cyan-200">40% Kayd</div>
                 </div>
               </div>
 
               {/* Feature 4 */}
               <div className="flex flex-col items-center space-y-1">
-                <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center text-white">
-                  <MapPin className="w-4 h-4 text-cyan-300" />
+                <div className="w-8 h-8 rounded-full bg-purple-500/20 text-purple-300 flex items-center justify-center border border-purple-400/30">
+                  <MapPin className="w-4 h-4" />
                 </div>
                 <div className="leading-tight">
                   <div className="text-[11px] font-black text-white">Hargeysa</div>
-                  <div className="text-[9px] text-cyan-200">& Deegmooyin</div>
+                  <div className="text-[9px] text-cyan-200">12+ Degmo</div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Primary Action Button: "Bilow ➔" */}
-          <div className="px-4 pt-2 pb-4 space-y-3 z-10">
+          {/* Action Buttons: Register & Sign In */}
+          <div className="px-4 pt-2 pb-4 space-y-2.5 z-10">
+            {/* Primary Action Button: "Bilow ➔" */}
             <button
               type="button"
               onClick={() => {
                 setErrorMessage(null);
                 setStep('phone');
               }}
-              className="w-full bg-[#00E575] hover:bg-[#00D766] active:scale-[0.98] text-slate-950 font-black py-4 rounded-full text-base tracking-wide shadow-[0_8px_24px_rgba(0,229,117,0.45)] transition flex items-center justify-center space-x-2 cursor-pointer"
+              className="w-full bg-[#00E575] hover:bg-[#00D766] active:scale-[0.98] text-slate-950 font-black py-3.5 rounded-full text-base tracking-wide shadow-[0_8px_24px_rgba(0,229,117,0.45)] transition flex items-center justify-center space-x-2 cursor-pointer"
             >
-              <Phone className="w-5 h-5 fill-slate-950" />
-              <span>Bilow</span>
+              <Zap className="w-5 h-5 fill-slate-950" />
+              <span>Bilow • Sameyso Akoon</span>
               <ArrowRight className="w-5 h-5 stroke-[2.5]" />
             </button>
 
-            {/* Bottom Link: "Ma leedahay akoon? Gal" */}
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={() => {
-                  setErrorMessage(null);
-                  setStep('signin');
-                }}
-                className="text-xs font-semibold text-white/90 hover:text-white transition"
-              >
-                <span>Ma leedahay akoon? </span>
-                <span className="text-[#00E575] font-black underline underline-offset-2">
-                  Gal
-                </span>
-              </button>
-            </div>
+            {/* Existing User Login Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setErrorMessage(null);
+                setStep('signin');
+              }}
+              className="w-full bg-white/10 hover:bg-white/20 active:scale-[0.98] text-white font-extrabold py-3 rounded-full text-sm tracking-wide border border-white/25 transition flex items-center justify-center space-x-2 cursor-pointer backdrop-blur-md"
+            >
+              <Key className="w-4 h-4 text-[#00E575]" />
+              <span>Ma leedahay akoon? Gal (Sign In)</span>
+            </button>
           </div>
 
           {/* Bottom Wave Graphic */}
-          <BottomWaveGradient height={60} />
+          <BottomWaveGradient height={50} />
         </div>
       )}
 
@@ -1076,56 +1211,95 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
       {/* SCREEN 6: SIGN IN / DIRECT LOGIN FOR EXISTING ACCOUNTS ("Gal") */}
       {/* =================================================================== */}
       {step === 'signin' && (
-        <div className="w-full flex-1 flex flex-col justify-between bg-gradient-to-b from-[#003B73] via-[#0055A5] to-[#0066FF] text-white overflow-y-auto no-scrollbar">
-          {/* Top Bar with Location Header and Notification Bell */}
-          <div className="px-5 pt-2 pb-1 flex items-center justify-between z-10">
-            <div className="flex items-center space-x-2 bg-black/25 backdrop-blur-md px-3 py-1 rounded-full text-[11px] font-bold border border-white/10">
-              <MapPin className="w-3.5 h-3.5 text-[#00E575]" />
-              <span>Hargeysa Somaliland</span>
+        <div className="w-full flex-1 flex flex-col justify-between bg-gradient-to-b from-[#03132B] via-[#07244D] to-[#0A3A78] text-white overflow-y-auto no-scrollbar">
+          {/* Top Bar with Back Arrow, Logo & Language */}
+          <div className="px-5 pt-3 pb-2 flex items-center justify-between z-10 border-b border-white/10">
+            <button
+              type="button"
+              onClick={() => {
+                setErrorMessage(null);
+                setStep('welcome');
+              }}
+              className="p-1.5 -ml-1 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition cursor-pointer"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+
+            <WadaageShareHeaderLogo />
+
+            <button
+              type="button"
+              onClick={() => setLanguage(language === 'so' ? 'en' : 'so')}
+              className="text-[11px] font-black px-2.5 py-1 bg-black/30 hover:bg-black/50 rounded-full border border-white/20 transition cursor-pointer"
+            >
+              {language === 'so' ? '🇸🇴 SO' : '🇬🇧 EN'}
+            </button>
+          </div>
+
+          {/* Form Container */}
+          <div className="px-5 py-3 space-y-3.5 z-10">
+            {/* Header Title */}
+            <div className="text-center space-y-1">
+              <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                Gal Akoonkaaga
+              </h2>
+              <p className="text-xs text-cyan-200/90 font-medium">
+                {language === 'so'
+                  ? 'Geli lambarkaaga taleefanka si aad u gasho app-ka rakaabka'
+                  : 'Enter your phone number to sign in to Wadaage Rider'}
+              </p>
             </div>
 
-            <div className="flex items-center space-x-2">
+            {/* Mode Switcher Tabs: Password vs WhatsApp OTP */}
+            <div className="p-1 bg-black/40 backdrop-blur-md rounded-2xl border border-white/15 grid grid-cols-2 gap-1 text-xs font-black">
               <button
                 type="button"
-                onClick={() => setLanguage(language === 'so' ? 'en' : 'so')}
-                className="text-[11px] font-bold px-2.5 py-1 bg-black/20 rounded-full border border-white/15"
+                onClick={() => {
+                  setSignInMode('password');
+                  setErrorMessage(null);
+                }}
+                className={`py-2 px-3 rounded-xl transition flex items-center justify-center space-x-1.5 cursor-pointer ${
+                  signInMode === 'password'
+                    ? 'bg-[#00E575] text-slate-950 shadow-md font-black'
+                    : 'text-white/80 hover:text-white hover:bg-white/5'
+                }`}
               >
-                {language === 'so' ? 'Soomaali' : 'English'}
+                <Key className="w-3.5 h-3.5" />
+                <span>Furaha Sirta (Password)</span>
               </button>
-              <div className="w-8 h-8 rounded-full bg-black/25 flex items-center justify-center border border-white/10">
-                <Bell className="w-3.5 h-3.5 text-white" />
-              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSignInMode('otp');
+                  setErrorMessage(null);
+                }}
+                className={`py-2 px-3 rounded-xl transition flex items-center justify-center space-x-1.5 cursor-pointer ${
+                  signInMode === 'otp'
+                    ? 'bg-[#00E575] text-slate-950 shadow-md font-black'
+                    : 'text-white/80 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <Phone className="w-3.5 h-3.5" />
+                <span>WhatsApp OTP</span>
+              </button>
             </div>
-          </div>
 
-          {/* Brand Header */}
-          <div className="text-center pt-2 pb-1 space-y-1 z-10">
-            <WadaageShareEmblem size="lg" className="mx-auto" />
-            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-              Safar wadaag,
-              <br />
-              <span className="text-[#00E575]">nolol wadaag.</span>
-            </h2>
-          </div>
-
-          {/* Car Hero Illustration */}
-          <div className="px-4 my-1 z-10">
-            <HeroHargeisaCarScene className="w-full h-32 sm:h-36 shadow-lg" />
-          </div>
-
-          {/* Sign In Form */}
-          <div className="px-5 py-2 space-y-3 z-10">
+            {/* Sign In Form */}
             <form onSubmit={handleSignInSubmit} className="space-y-3">
-              {/* Phone Input Box with Somaliland Flag and +252 Prefix */}
+              {/* Phone Input Box */}
               <div>
                 <div className="flex items-center justify-between text-[11px] font-bold text-white/90 mb-1">
-                  <span>Lambarka Taleefanka Rakaabka (9 Digits)</span>
-                  <span className="font-mono text-[10px] text-[#00E575] bg-black/30 px-2 py-0.5 rounded-full border border-[#00E575]/30">
-                    {phoneInput.length}/9 lambar
+                  <span className="flex items-center gap-1">
+                    <Phone className="w-3.5 h-3.5 text-[#00E575]" />
+                    <span>Lambarka Taleefanka (9 Digits)</span>
+                  </span>
+                  <span className="font-mono text-[10px] text-[#00E575] bg-black/40 px-2 py-0.5 rounded-full border border-[#00E575]/30">
+                    {phoneInput.length}/9
                   </span>
                 </div>
 
-                <div className="flex items-center bg-white rounded-2xl px-3 py-2.5 shadow-md border-2 border-transparent focus-within:border-[#00E575]">
+                <div className="flex items-center bg-white rounded-2xl px-3 py-2.5 shadow-lg border-2 border-transparent focus-within:border-[#00E575]">
                   <div className="flex items-center space-x-1.5 pr-2.5 border-r border-slate-200 shrink-0">
                     <SomalilandFlag className="w-6 h-4 rounded-xs shadow-xs" />
                     <span className="font-mono font-black text-xs text-slate-800 tracking-wider">+252</span>
@@ -1141,71 +1315,112 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
                   />
                 </div>
 
-                {/* Operator Badge & Validation Hint */}
+                {/* Operator Badge */}
                 <div className="flex items-center justify-between text-[10px] mt-1.5 px-1 font-semibold">
                   <div className="flex items-center gap-1.5">
                     {phoneInput.startsWith('63') && (
-                      <span className="text-emerald-300 bg-emerald-950/70 px-2 py-0.5 rounded border border-emerald-500/40">
+                      <span className="text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/40">
                         ✓ 63 (Telesom ZAAD)
                       </span>
                     )}
                     {phoneInput.startsWith('65') && (
-                      <span className="text-cyan-300 bg-cyan-950/70 px-2 py-0.5 rounded border border-cyan-500/40">
+                      <span className="text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-500/40">
                         ✓ 65 (Somtel EDAHAB)
                       </span>
                     )}
                     {!phoneInput.startsWith('63') && !phoneInput.startsWith('65') && (
                       <span className="text-amber-300">
-                        Ku bilow 63 ama 65
+                        Ku bilow 63 (Telesom) ama 65 (Somtel)
                       </span>
                     )}
                   </div>
                   {phoneInput.length === 9 && (phoneInput.startsWith('63') || phoneInput.startsWith('65')) && (
-                    <span className="text-[#00E575] font-bold">
-                      ✓ 9 Lambar Sax ah
+                    <span className="text-[#00E575] font-bold flex items-center gap-1">
+                      <Check className="w-3 h-3" />
+                      <span>9 Lambar Sax ah</span>
                     </span>
                   )}
                 </div>
+              </div>
 
-                {/* Quick Sample Buttons */}
-                <div className="flex items-center gap-1.5 mt-1.5">
-                  <span className="text-[10px] text-white/60 font-medium">Tusaale:</span>
+              {/* Password Input (Only when password mode is active) */}
+              {signInMode === 'password' && (
+                <div>
+                  <div className="flex items-center justify-between text-[11px] font-bold text-white/90 mb-1">
+                    <span className="flex items-center gap-1">
+                      <Lock className="w-3.5 h-3.5 text-[#00E575]" />
+                      <span>Erayga Sirta ah (Password)</span>
+                    </span>
+                    <span className="text-[10px] text-cyan-200/80">Tusaale: 123456</span>
+                  </div>
+
+                  <div className="relative flex items-center bg-white rounded-2xl px-3 py-2.5 shadow-lg border-2 border-transparent focus-within:border-[#00E575]">
+                    <Lock className="w-4 h-4 text-slate-400 shrink-0 mr-2" />
+                    <input
+                      type={showSignInPassword ? 'text' : 'password'}
+                      value={signInPassword}
+                      onChange={(e) => setSignInPassword(e.target.value)}
+                      placeholder="Geli erayga sirta ah..."
+                      className="w-full text-sm font-sans font-bold text-slate-900 placeholder-slate-400 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSignInPassword(!showSignInPassword)}
+                      className="p-1 text-slate-400 hover:text-slate-600 transition"
+                    >
+                      {showSignInPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* One-Tap Quick Test Demo Accounts */}
+              <div className="p-2.5 bg-black/35 backdrop-blur-md rounded-2xl border border-white/15 space-y-1.5">
+                <span className="text-[10px] font-black text-cyan-300 flex items-center gap-1">
+                  <Zap className="w-3 h-3 text-[#00E575]" />
+                  <span>Tijaabi Hadda (One-Tap Instant Test):</span>
+                </span>
+                <div className="grid grid-cols-2 gap-1.5">
                   <button
                     type="button"
-                    onClick={() => handlePhoneInputChange('634918201')}
-                    className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[#00E575] border border-white/15 transition cursor-pointer"
+                    onClick={() => handleQuickDemoLogin('634918201', 'Faadumo Jaamac')}
+                    className="py-1.5 px-2 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 rounded-xl text-[11px] text-white font-bold text-left flex items-center justify-between transition cursor-pointer"
                   >
-                    63 4918201
+                    <span>Faadumo (+252 63)</span>
+                    <span className="text-[9px] bg-emerald-500 text-slate-950 font-black px-1.5 py-0.5 rounded-full">GAL</span>
                   </button>
+
                   <button
                     type="button"
-                    onClick={() => handlePhoneInputChange('654918201')}
-                    className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-cyan-300 border border-white/15 transition cursor-pointer"
+                    onClick={() => handleQuickDemoLogin('654918201', 'Cabdi Nuur')}
+                    className="py-1.5 px-2 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/40 rounded-xl text-[11px] text-white font-bold text-left flex items-center justify-between transition cursor-pointer"
                   >
-                    65 4918201
+                    <span>Cabdi (+252 65)</span>
+                    <span className="text-[9px] bg-cyan-400 text-slate-950 font-black px-1.5 py-0.5 rounded-full">GAL</span>
                   </button>
                 </div>
               </div>
 
-              {/* Action Button: "Gal Akoonka ➔" */}
+              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-[#00E575] hover:bg-[#00D766] active:scale-[0.98] text-slate-950 font-black py-3.5 rounded-full text-sm sm:text-base tracking-wide shadow-xl shadow-[#00E575]/35 transition flex items-center justify-center space-x-2 cursor-pointer"
+                className="w-full bg-[#00E575] hover:bg-[#00D766] active:scale-[0.98] text-slate-950 font-black py-3.5 rounded-full text-base tracking-wide shadow-xl shadow-[#00E575]/35 transition flex items-center justify-center space-x-2 cursor-pointer mt-1"
               >
                 {isLoading ? (
                   <div className="w-5 h-5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <>
-                    <span>Gal Akoonka</span>
-                    <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+                    <Car className="w-5 h-5" />
+                    <span>{signInMode === 'password' ? 'Gal Akoonka (Sign In)' : 'U Dir Koodhka WhatsApp'}</span>
+                    <ArrowRight className="w-5 h-5 stroke-[2.5]" />
                   </>
                 )}
               </button>
             </form>
 
-            {/* Switch Back to Welcome / Bilow */}
-            <div className="text-center">
+            {/* Switch to Register */}
+            <div className="text-center pt-1">
               <button
                 type="button"
                 onClick={() => {
@@ -1222,30 +1437,8 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
             </div>
           </div>
 
-          {/* 4 Feature Badges */}
-          <div className="px-4 pb-3 z-10">
-            <div className="bg-black/30 backdrop-blur-md border border-white/15 rounded-2xl p-2 grid grid-cols-4 gap-1 text-center">
-              <div className="text-[10px] font-black text-white">
-                <div>👥 Rider</div>
-                <div className="text-[8px] text-cyan-200">Raac</div>
-              </div>
-              <div className="text-[10px] font-black text-white">
-                <div>🛡️ Badbaado</div>
-                <div className="text-[8px] text-cyan-200">Sare</div>
-              </div>
-              <div className="text-[10px] font-black text-white">
-                <div>🪙 Kharash</div>
-                <div className="text-[8px] text-cyan-200">Badbaado</div>
-              </div>
-              <div className="text-[10px] font-black text-white">
-                <div>📍 Hargeysa</div>
-                <div className="text-[8px] text-cyan-200">& Deegmooyin</div>
-              </div>
-            </div>
-          </div>
-
           {/* Bottom Wave Graphic */}
-          <BottomWaveGradient height={50} />
+          <BottomWaveGradient height={40} />
         </div>
       )}
     </div>

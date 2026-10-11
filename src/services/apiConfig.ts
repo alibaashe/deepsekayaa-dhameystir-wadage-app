@@ -27,7 +27,25 @@ export function isNativeMobileApp(): boolean {
 export function getServerBaseUrl(): string {
   if (typeof window === 'undefined') return '';
 
-  // 1. Check if user configured a custom Hostinger server domain in Admin / App Settings
+  // 1. If running inside web browser environment (AI Studio preview or web preview),
+  // always prefer relative paths to the applet's own Express backend on port 3000
+  if (
+    typeof window !== 'undefined' &&
+    window.location.origin &&
+    (window.location.origin.startsWith('http://') || window.location.origin.startsWith('https://')) &&
+    !isNativeMobileApp()
+  ) {
+    // Only use savedUrl if running on a custom domain explicitly, but in dev/cloud preview always use local Express server
+    try {
+      const savedUrl = localStorage.getItem(SERVER_URL_STORAGE_KEY);
+      if (savedUrl && savedUrl.trim().length > 0 && !window.location.hostname.includes('run.app') && !window.location.hostname.includes('localhost')) {
+        return savedUrl.trim().replace(/\/+$/, '');
+      }
+    } catch (_e) {}
+    return '';
+  }
+
+  // 2. Check if user configured a custom Hostinger server domain in Admin / App Settings
   try {
     const savedUrl = localStorage.getItem(SERVER_URL_STORAGE_KEY);
     if (savedUrl && savedUrl.trim().length > 0) {
@@ -35,24 +53,18 @@ export function getServerBaseUrl(): string {
     }
   } catch (_e) {}
 
-  // 2. Check environment variable (configured during build)
+  // 3. Check environment variable (configured during build)
   const envApiUrl = (import.meta as any).env?.VITE_API_URL;
   if (envApiUrl && typeof envApiUrl === 'string' && envApiUrl.trim()) {
     return envApiUrl.trim().replace(/\/+$/, '');
   }
 
-  // 3. If running inside Capacitor APK on mobile, use default remote server endpoint
+  // 4. If running inside Capacitor APK on mobile, use default remote server endpoint
   if (isNativeMobileApp()) {
     return DEFAULT_REMOTE_URL;
   }
 
-  // 4. In web browser: if origin is an actual HTTP/HTTPS domain, relative path or window.location.origin
-  if (window.location.origin && (window.location.origin.startsWith('http://') || window.location.origin.startsWith('https://'))) {
-    // If not local host, or on port 3000, can use relative path or origin
-    return '';
-  }
-
-  return DEFAULT_REMOTE_URL;
+  return '';
 }
 
 /**
@@ -79,14 +91,23 @@ export function getApiUrl(endpoint: string): string {
 
 /**
  * Enhanced fetch wrapper that automatically routes to the proper Hostinger/Cloud backend
+ * and gracefully catches network errors without unhandled exceptions
  */
 export async function apiFetch(endpoint: string, init?: RequestInit): Promise<Response> {
   const url = getApiUrl(endpoint);
-  return fetch(url, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers || {}),
-    },
-  });
+  try {
+    return await fetch(url, {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(init?.headers || {}),
+      },
+    });
+  } catch (err) {
+    console.warn(`[apiFetch] Network request to ${url} failed:`, err);
+    return new Response(JSON.stringify({ error: 'Network unavailable', success: false }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 }
