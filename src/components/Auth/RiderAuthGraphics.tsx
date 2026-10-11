@@ -438,77 +438,65 @@ export const BottomWaveGradient: React.FC<{ className?: string; height?: number 
 // Features Hargeisa city mountains, waving Somaliland flag, and white branded Wadaage Share car!
 export const HeroHargeisaCarScene: React.FC<{ className?: string }> = ({ className = 'w-full h-48' }) => {
   return (
-    <div className={`relative overflow-hidden rounded-3xl select-none ${className}`}>
-      {/* Background panoramic landscape with mountains and sunny sky */}
-      <div className="absolute inset-0 bg-gradient-to-b from-[#60A5FA] via-[#93C5FD] to-[#E2E8F0]">
-        {/* Sky with clouds */}
-        <div className="absolute top-2 left-6 w-16 h-5 bg-white/70 rounded-full blur-[1px]" />
-        <div className="absolute top-4 right-16 w-20 h-6 bg-white/80 rounded-full blur-[1px]" />
+    <div className={`relative overflow-hidden rounded-3xl select-none shadow-2xl border border-white/20 group ${className}`}>
+      {/* Background authentic Hargeisa city panoramic photo with rich gradient overlay */}
+      <div className="absolute inset-0 z-0">
+        <img
+          src="/images/wadaage_hero_hargeisa.jpg"
+          alt="Hargeisa Somaliland"
+          className="w-full h-full object-cover object-center scale-105 group-hover:scale-100 transition-transform duration-1000 ease-out"
+          onError={(e) => {
+            // Fallback gradient if file missing
+            (e.target as HTMLElement).style.display = 'none';
+          }}
+        />
+        {/* Cinematic atmospheric overlays: Warm golden sunset to deep Wadaage blue gradient */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#002244]/90 via-[#003B73]/50 to-transparent mix-blend-multiply" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#003B73]/70 via-transparent to-[#001f3f]/60" />
+      </div>
 
-        {/* Mountain ridge backdrop (Naasa Hablood hills of Hargeisa) */}
-        <svg
-          viewBox="0 0 400 120"
-          className="absolute bottom-10 left-0 w-full h-24 object-cover opacity-80"
-          preserveAspectRatio="none"
-        >
-          <path
-            d="M 0 120 L 0 60 C 40 45, 90 30, 140 50 C 190 70, 230 40, 280 45 C 330 50, 370 35, 400 55 L 400 120 Z"
-            fill="#86A789"
-          />
-          <path
-            d="M 0 120 L 0 75 C 60 60, 120 70, 180 65 C 240 60, 310 75, 400 65 L 400 120 Z"
-            fill="#4E6E58"
-          />
-        </svg>
-
-        {/* Lush Green Trees and City Skyline */}
-        <div className="absolute bottom-9 left-0 right-0 h-6 flex items-end justify-between px-2 overflow-hidden opacity-90">
-          <div className="w-8 h-8 rounded-full bg-emerald-700 -mb-2" />
-          <div className="w-10 h-10 rounded-full bg-emerald-800 -mb-3" />
-          <div className="w-6 h-6 rounded-full bg-emerald-600 -mb-1" />
-          <div className="w-9 h-9 rounded-full bg-emerald-700 -mb-2" />
-          <div className="w-12 h-12 rounded-full bg-emerald-800 -mb-4" />
-          <div className="w-7 h-7 rounded-full bg-emerald-600 -mb-1" />
+      {/* Floating City Badges (Hargeysa • Naasa Hablood) */}
+      <div className="absolute top-2.5 left-3 z-20 flex items-center space-x-1.5">
+        <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-slate-950/60 backdrop-blur-md border border-white/25 text-white text-[10px] font-extrabold shadow-lg">
+          <span className="w-2 h-2 rounded-full bg-[#00E575] animate-pulse" />
+          <span>Hargeysa • Somaliland</span>
         </div>
+      </div>
 
-        {/* Somaliland Flag on Flagpole waving on the right */}
-        <div className="absolute top-3 right-5 z-20 flex flex-col items-start drop-shadow-md">
-          {/* Flagpole */}
-          <div className="w-1 h-20 bg-slate-400 rounded-t-full relative">
-            {/* Gold finial ball on top */}
-            <div className="w-2 h-2 rounded-full bg-amber-400 absolute -top-1 -left-0.5" />
-            {/* Somaliland Waving Flag */}
-            <div className="absolute top-1 left-1 w-14 h-9 shadow-md rounded-xs overflow-hidden border border-black/10 flex flex-col">
-              {/* Green stripe */}
-              <div className="h-3 bg-[#008751] flex items-center justify-center text-[5px] text-white font-bold tracking-tight">
-                لا إله إلا الله
-              </div>
-              {/* White stripe with black 5-pointed star */}
-              <div className="h-3 bg-white flex items-center justify-center text-[8px] text-black font-black leading-none">
-                ★
-              </div>
-              {/* Red stripe */}
-              <div className="h-3 bg-[#D21034]" />
+      {/* Somaliland Flag on Flagpole waving on the right */}
+      <div className="absolute top-2.5 right-3.5 z-20 flex flex-col items-start drop-shadow-xl">
+        <div className="w-1 h-16 bg-slate-300 rounded-t-full relative shadow-md">
+          {/* Gold finial ball on top */}
+          <div className="w-2 h-2 rounded-full bg-amber-400 absolute -top-1 -left-0.5 shadow-sm" />
+          {/* Somaliland Waving Flag */}
+          <div className="absolute top-0.5 left-1 w-14 h-9 shadow-xl rounded-xs overflow-hidden border border-black/20 flex flex-col">
+            {/* Green stripe */}
+            <div className="h-3 bg-[#008751] flex items-center justify-center text-[5px] text-white font-bold tracking-tight">
+              لا إله إلا الله
             </div>
+            {/* White stripe with black 5-pointed star */}
+            <div className="h-3 bg-white flex items-center justify-center text-[8px] text-black font-black leading-none">
+              ★
+            </div>
+            {/* Red stripe */}
+            <div className="h-3 bg-[#D21034]" />
           </div>
         </div>
+      </div>
 
-        {/* Road surface */}
-        <div className="absolute bottom-0 left-0 right-0 h-11 bg-gradient-to-b from-slate-700 to-slate-900 border-t-2 border-slate-600">
-          {/* Center Road Dash Markings */}
-          <div className="absolute top-1/2 left-0 right-0 h-0.5 border-b-2 border-dashed border-amber-400/80 -translate-y-1/2" />
-        </div>
+      {/* Road surface with street illumination */}
+      <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-b from-slate-900/90 via-slate-950 to-black border-t border-slate-700/80 z-10">
+        {/* Center Road Dash Markings */}
+        <div className="absolute top-1/2 left-0 right-0 h-0.5 border-b-2 border-dashed border-amber-400/90 -translate-y-1/2" />
       </div>
 
       {/* Modern White Branded Toyota Car on Road */}
       <div className="absolute bottom-1 left-2 sm:left-4 z-30 w-52 sm:w-60 h-28 flex items-end">
-        {/* High quality white car image or realistic SVG with door logo */}
         <img
           src="/images/car_wadaage_share.jpg"
           alt="Wadaage Share Car"
-          className="w-full h-full object-contain drop-shadow-[0_8px_16px_rgba(0,0,0,0.6)]"
+          className="w-full h-full object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)]"
           onError={(e) => {
-            // Fallback to stylized SVG if local image fails
             (e.target as HTMLElement).style.display = 'none';
           }}
         />

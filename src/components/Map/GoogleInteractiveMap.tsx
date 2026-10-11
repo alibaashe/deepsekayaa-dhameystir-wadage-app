@@ -864,10 +864,9 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
                 color={driver.vehicle?.color || (driver as any).carColor || 'White'}
                 model={driver.vehicle?.model || (driver as any).carModel || 'Toyota Vitz'}
                 licensePlate={driver.vehicle?.licensePlate || (driver as any).licensePlate || 'SL-Taxi'}
-                driverName={driver.name}
                 heading={driver.currentHeading || 0}
                 isAssigned={isAssigned}
-                showDetails={isAssigned}
+                showDetails={false}
                 size={isAssigned ? 'md' : 'sm'}
               />
             </div>

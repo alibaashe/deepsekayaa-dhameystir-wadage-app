@@ -538,7 +538,19 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const saved = localStorage.getItem('wadaage_registered_drivers');
       if (saved) {
         const parsed = safeJsonParse(saved, null);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Normalize and ensure vehicle object is always robustly present
+          return parsed.map((d: any) => ({
+            ...d,
+            vehicle: d.vehicle || {
+              model: d.vehicle_model || d.model || 'Toyota Vitz',
+              licensePlate: d.vehicle_plate || d.licensePlate || 'SL-Taxi',
+              color: d.vehicle_color || d.color || 'White',
+              category: d.vehicle_category || d.category || 'wadaage_taxi',
+              capacity: 4,
+            },
+          }));
+        }
       }
     } catch (e) {
       console.error(e);

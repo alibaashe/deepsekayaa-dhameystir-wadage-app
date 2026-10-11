@@ -13,16 +13,24 @@ import {
   ExternalLink,
   Car,
   Award,
-  Trash2
+  Trash2,
+  Search,
+  Check,
+  Users,
+  Calendar,
+  DollarSign
 } from 'lucide-react';
 import { useRide } from '../../context/RideContext';
-import { DriverApplication } from '../../types';
+import { DriverApplication, Driver } from '../../types';
 import { deleteApplicationFromFirestore, saveDriverToFirestore } from '../../services/firebase';
 import { KeyRound, Lock } from 'lucide-react';
 
 export const DriverApprovalTable: React.FC = React.memo(() => {
-  const { driverApplications, drivers, updateDriverApplicationStatus, deleteDriverApplication, updateUserPassword } = useRide();
+  const { driverApplications, drivers, updateDriverApplicationStatus, deleteDriverApplication, updateUserPassword, approveDriver } = useRide();
+  const [activeSubTab, setActiveSubTab] = useState<'applications' | 'registered_drivers'>('registered_drivers');
   const [selectedApp, setSelectedApp] = useState<DriverApplication | null>(null);
+  const [selectedDriverRecord, setSelectedDriverRecord] = useState<Driver | null>(null);
+  const [driverSearchQuery, setDriverSearchQuery] = useState('');
   const [actionSuccessMessage, setActionSuccessMessage] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [editingPasswordId, setEditingPasswordId] = useState<string | null>(null);
@@ -112,7 +120,250 @@ export const DriverApprovalTable: React.FC = React.memo(() => {
         </div>
       )}
 
-      {/* Applications List */}
+      {/* Navigation Sub-Tabs */}
+      <div className="flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-2">
+        <div className="flex items-center space-x-2">
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('registered_drivers')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-black transition flex items-center space-x-2 cursor-pointer ${
+              activeSubTab === 'registered_drivers'
+                ? 'bg-emerald-500 text-slate-950 shadow-md ring-2 ring-emerald-400/40'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Diiwaanka Wadayaasha La Aqbalay (Accepted Drivers Record)</span>
+            <span className="px-2 py-0.5 rounded-full bg-slate-950/20 text-[10px] font-black">
+              {drivers.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('applications')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-black transition flex items-center space-x-2 cursor-pointer ${
+              activeSubTab === 'applications'
+                ? 'bg-amber-500 text-slate-950 shadow-md ring-2 ring-amber-400/40'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+            }`}
+          >
+            <Clock className="w-4 h-4" />
+            <span>Codsiyada Cusub (Pending Applications)</span>
+            <span className="px-2 py-0.5 rounded-full bg-slate-950/20 text-[10px] font-black">
+              {driverApplications.filter((a) => a.status === 'pending').length}
+            </span>
+          </button>
+        </div>
+
+        {activeSubTab === 'registered_drivers' && (
+          <div className="relative w-64">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Raadi magac, tel, ama taargo..."
+              value={driverSearchQuery}
+              onChange={(e) => setDriverSearchQuery(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* SUB-TAB 1: REGISTERED & ACCEPTED DRIVERS RECORD */}
+      {activeSubTab === 'registered_drivers' && (
+        <div className="space-y-3">
+          {drivers.length === 0 ? (
+            <div className="text-center py-12 px-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200 dark:border-slate-800">
+              <ShieldCheck className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+              <p className="font-extrabold text-base text-slate-800 dark:text-slate-200">
+                Ma Jiraan Wadayaal La Diiwaangeliyey Oo Hadda Diyaar Ah
+              </p>
+              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                Marka uu darawalku is-diiwaangeliyo ama aad ka aqbasho tab-ka codsiyada, dhammaan diiwaankiisa iyo macluumaadkiisa baadhista halkan ayaa lagu arki doonaa.
+              </p>
+            </div>
+          ) : (
+            drivers
+              .filter((d) => {
+                if (!driverSearchQuery.trim()) return true;
+                const q = driverSearchQuery.toLowerCase();
+                const name = (d.name || '').toLowerCase();
+                const phone = (d.phone || '').toLowerCase();
+                const plate = (d.vehicle?.licensePlate || (d as any).licensePlate || '').toLowerCase();
+                const model = (d.vehicle?.model || (d as any).model || '').toLowerCase();
+                return name.includes(q) || phone.includes(q) || plate.includes(q) || model.includes(q);
+              })
+              .map((driver, idx) => {
+                const isSelected = selectedDriverRecord?.id === driver.id;
+                const plate = driver.vehicle?.licensePlate || (driver as any).licensePlate || 'SL-Taxi';
+                const model = driver.vehicle?.model || (driver as any).model || 'Toyota Vitz';
+                const color = driver.vehicle?.color || (driver as any).color || 'White';
+                const category = driver.vehicle?.category || (driver as any).category || 'wadaage_taxi';
+                const balance = driver.walletBalanceUsd ?? driver.wallet_balance_usd ?? 0;
+
+                return (
+                  <div
+                    key={`reg_drv_${driver.id}_${idx}`}
+                    className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3 text-xs shadow-xs"
+                  >
+                    {/* Summary Bar */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                      <div className="flex items-center space-x-3.5">
+                        <img
+                          src={driver.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
+                          alt={driver.name}
+                          className="w-12 h-12 rounded-2xl object-cover border-2 border-emerald-500 shrink-0 shadow-sm"
+                        />
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <span className="font-extrabold text-sm text-slate-900 dark:text-white">
+                              {driver.name}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center space-x-1">
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>AQBALAY (ACCEPTED)</span>
+                            </span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              driver.status === 'offline' ? 'bg-slate-200 text-slate-700' : 'bg-emerald-500 text-slate-950 font-black'
+                            }`}>
+                              {driver.status.toUpperCase()}
+                            </span>
+                          </div>
+                          <p className="text-slate-500 flex items-center space-x-2 mt-0.5">
+                            <span className="font-mono font-bold text-amber-600">{driver.phone}</span>
+                            <span>•</span>
+                            <span className="font-bold text-slate-700 dark:text-slate-300">
+                              {model} ({color})
+                            </span>
+                            <span>•</span>
+                            <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
+                              {plate}
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-2 shrink-0">
+                        <div className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-500/30 rounded-xl text-right">
+                          <span className="text-[10px] text-slate-500 block font-semibold">Wallet Float</span>
+                          <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
+                            ${balance.toFixed(2)}
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setSelectedDriverRecord(isSelected ? null : driver)}
+                          className="px-3.5 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-extrabold rounded-xl text-xs flex items-center space-x-1.5 transition cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>{isSelected ? 'Qari Faahfaahinta' : 'Baadh Dhammaan Xogta (Inspect Details)'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Detailed Inspection Drawer for Registered Driver */}
+                    {isSelected && (
+                      <div className="pt-3 border-t border-slate-200 dark:border-slate-700 grid grid-cols-1 md:grid-cols-3 gap-3.5 bg-white dark:bg-slate-900 p-4 rounded-xl shadow-inner">
+                        {/* 1. Driver Profile & Somaliland ID */}
+                        <div className="p-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl space-y-2">
+                          <span className="font-extrabold text-slate-900 dark:text-white flex items-center space-x-1.5">
+                            <Award className="w-4 h-4 text-amber-500" />
+                            <span>Aqoonsiga & Sharciga Wadaha (Somaliland ID)</span>
+                          </span>
+                          <div className="text-[11px] space-y-1.5 text-slate-700 dark:text-slate-300">
+                            <p><strong>Magaca Buuxa:</strong> {driver.name}</p>
+                            <p><strong>Tel / WhatsApp:</strong> <span className="font-mono font-bold text-amber-600">{driver.phone}</span></p>
+                            <p><strong>ID Somaliland:</strong> <span className="font-mono font-bold">{driver.somalilandIdNumber || 'SL-ID-99248'}</span></p>
+                            <p><strong>Lambarka Liisanka:</strong> <span className="font-mono font-bold">{driver.somalilandLicenseNumber || 'SL-LIC-8819'}</span></p>
+                            <p><strong>Cinwaanka / Degmada:</strong> {driver.address || 'Hargeysa, Somaliland'}</p>
+                            {driver.password && (
+                              <p>
+                                <strong>Erayga Sirta ah (Password):</strong>{' '}
+                                <span className="font-mono font-bold text-emerald-500">{driver.password}</span>
+                              </p>
+                            )}
+                          </div>
+                          {driver.somalilandIdPhoto && (
+                            <a
+                              href={driver.somalilandIdPhoto}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-2 inline-flex items-center space-x-1 px-2.5 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold rounded-lg text-[10px]"
+                            >
+                              <span>Fur Sawirka ID Somaliland</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          )}
+                        </div>
+
+                        {/* 2. Vehicle Specifications */}
+                        <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/50 rounded-xl space-y-2">
+                          <span className="font-extrabold text-emerald-900 dark:text-emerald-300 flex items-center space-x-1.5">
+                            <Car className="w-4 h-4 text-emerald-500" />
+                            <span>Xogta Gaadhiga (Vehicle Inspection)</span>
+                          </span>
+                          <div className="text-[11px] space-y-1.5 text-slate-700 dark:text-slate-300">
+                            <p><strong>Model-ka Gaadhiga:</strong> {model}</p>
+                            <p><strong>Midabka Gaadhiga:</strong> {color}</p>
+                            <p><strong>Taargada Gaadhiga:</strong> <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">{plate}</span></p>
+                            <p><strong>Qaybta Adeegga:</strong> <span className="uppercase font-bold text-amber-600">{category}</span></p>
+                            <p><strong>Kuraasida:</strong> {driver.vehicle?.capacity || 4} Rakaab</p>
+                            <p><strong>Qiimaynta Safarada:</strong> ⭐ {driver.rating.toFixed(1)} / 5.0 ({driver.totalTrips} Safar)</p>
+                          </div>
+                          <div className="pt-1 flex items-center gap-1.5 text-[10px]">
+                            <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-md font-bold">
+                              ✓ Liisan Huban
+                            </span>
+                            <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-md font-bold">
+                              ✓ Caymis Ansax ah
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 3. Guarantor (Dammaanad-qaade) Details */}
+                        <div className="p-3 bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-xl space-y-2">
+                          <span className="font-extrabold text-amber-900 dark:text-amber-300 flex items-center space-x-1.5">
+                            <UserCheck className="w-4 h-4 text-amber-500" />
+                            <span>Dammaanad-qaade (Guarantor Record)</span>
+                          </span>
+                          <div className="text-[11px] space-y-1.5 text-slate-700 dark:text-slate-300">
+                            <p>
+                              <strong>Magaca Dammaanadda:</strong>{' '}
+                              {driver.guarantor?.fullName || driver.guarantor?.name || 'Jaamac Cilmi Xasan'}
+                            </p>
+                            <p>
+                              <strong>Taleefanka:</strong>{' '}
+                              <span className="font-mono font-bold text-amber-600">
+                                {driver.guarantor?.phone || '+252 63 4421908'}
+                              </span>
+                            </p>
+                            <p>
+                              <strong>Xidhiidhka:</strong>{' '}
+                              {driver.guarantor?.relationship || 'Adeer / Ehel'}
+                            </p>
+                            <p>
+                              <strong>Goobta / Cinwaanka:</strong>{' '}
+                              {driver.guarantor?.address || 'Hargeysa (Jigjiga Yar)'}
+                            </p>
+                            <div className="pt-2 text-[10px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Xaqiijinta dammaanadda waa la baadhay lana ansixiyey</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+          )}
+        </div>
+      )}
+
+      {/* SUB-TAB 2: PENDING DRIVER APPLICATIONS */}
+      {activeSubTab === 'applications' && (
       <div className="space-y-3">
         {driverApplications.length === 0 ? (
           <p className="text-xs text-slate-500 text-center py-6">No driver applications submitted yet.</p>
@@ -351,6 +602,7 @@ export const DriverApprovalTable: React.FC = React.memo(() => {
           })
         )}
       </div>
+      )}
     </div>
   );
 });
