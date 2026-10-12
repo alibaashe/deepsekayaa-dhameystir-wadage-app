@@ -15,8 +15,8 @@ export const WadaageRiderHeroHeader: React.FC<WadaageRiderHeroHeaderProps> = ({
       {/* 1. Background City Twilight Skyline Image */}
       <div className="absolute inset-0 z-0">
         <img
-          src="/images/wadaage_hero_hargeisa.jpg"
-          alt="Hargeisa Twilight Skyline"
+          src="/images/hargeisa_night_flag.jpg"
+          alt="Hargeisa Somaliland Night Skyline"
           className="w-full h-full object-cover object-center filter contrast-110 brightness-90"
           onError={(e) => {
             (e.currentTarget as HTMLElement).style.display = 'none';

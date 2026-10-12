@@ -595,7 +595,7 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     const minY = Math.max(0, Math.min(minTile.y, maxTile.y) - 1);
     const maxY = Math.max(minTile.y, maxTile.y) + 1;
 
-    const subdomains = ['a', 'b', 'c', 'd'];
+    const subdomains = [0, 1, 2, 3];
 
     for (let tx = minX; tx <= maxX; tx++) {
       for (let ty = minY; ty <= maxY; ty++) {
@@ -604,22 +604,24 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
         const screenX = tilePixelX - centerPixel.x + dimensions.width / 2;
         const screenY = tilePixelY - centerPixel.y + dimensions.height / 2;
 
-        const sub = subdomains[Math.abs(tx + ty) % subdomains.length];
-        let url = `https://${sub}.basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${tx}/${ty}.png`;
+        const subNum = subdomains[Math.abs(tx + ty) % subdomains.length];
+        // Official Google Maps direct tiles
+        let lyrParam = 'm'; // roadmap
         if (mapLayer === 'satellite') {
-          url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${ty}/${tx}`;
+          lyrParam = 's'; // satellite
         } else if (mapLayer === 'dark') {
-          url = `https://${sub}.basemaps.cartocdn.com/dark_all/${zoom}/${tx}/${ty}.png`;
+          lyrParam = 'r'; // styled road / dark
         }
 
-        const fallbackUrl = `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`;
+        const url = `https://mt${subNum}.google.com/vt/lyrs=${lyrParam}&hl=en&x=${tx}&y=${ty}&z=${zoom}`;
+        const fallbackUrl = `https://mt${(subNum + 1) % 4}.google.com/vt/lyrs=${lyrParam}&hl=en&x=${tx}&y=${ty}&z=${zoom}`;
 
         list.push({
           x: tx,
           y: ty,
           left: screenX,
           top: screenY,
-          key: `map_${mapLayer}_${zoom}_${tx}_${ty}`,
+          key: `gmap_${mapLayer}_${zoom}_${tx}_${ty}`,
           url,
           fallbackUrl,
         });
@@ -967,6 +969,23 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
           >
             <Minus className="w-4 h-4" />
           </button>
+        </div>
+      </div>
+
+      {/* Official Google Maps Brand Watermark & Attribution */}
+      <div className="absolute bottom-1.5 left-2 z-20 pointer-events-none select-none">
+        <div className="bg-white/85 dark:bg-black/70 backdrop-blur-xs px-2 py-0.5 rounded-sm flex items-center space-x-1.5 shadow-xs border border-black/5 dark:border-white/10">
+          <span className="font-sans font-black text-xs tracking-tighter leading-none inline-flex items-center">
+            <span className="text-[#4285F4]">G</span>
+            <span className="text-[#EA4335]">o</span>
+            <span className="text-[#FBBC05]">o</span>
+            <span className="text-[#4285F4]">g</span>
+            <span className="text-[#34A853]">l</span>
+            <span className="text-[#EA4335]">e</span>
+          </span>
+          <span className="text-[9px] text-slate-600 dark:text-slate-300 font-medium tracking-tight">
+            Map data © Google
+          </span>
         </div>
       </div>
     </div>

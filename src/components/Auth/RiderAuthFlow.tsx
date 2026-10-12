@@ -442,30 +442,6 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
   return (
     <div className="w-full h-full min-h-[620px] max-w-sm sm:max-w-md mx-auto bg-white text-slate-900 flex flex-col justify-between relative overflow-hidden select-none font-sans shadow-2xl rounded-[36px] border border-slate-200">
 
-      {/* TOP STATUS BAR (9:41, Cellular, WiFi, Battery) */}
-      <div className={`w-full px-6 pt-3 pb-1 flex items-center justify-between text-xs font-semibold z-30 transition-colors ${
-        step === 'welcome' || step === 'signin' ? 'text-white' : 'text-slate-800'
-      }`}>
-        <span className="font-bold tracking-tight">9:41</span>
-        <div className="flex items-center space-x-1.5">
-          {/* Signal Bars */}
-          <div className="flex items-end space-x-0.5 h-2.5">
-            <div className="w-0.5 h-1 bg-current rounded-full" />
-            <div className="w-0.5 h-1.5 bg-current rounded-full" />
-            <div className="w-0.5 h-2 bg-current rounded-full" />
-            <div className="w-0.5 h-2.5 bg-current rounded-full" />
-          </div>
-          {/* WiFi */}
-          <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-            <path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21L24 8.98C20.93 5.9 16.69 4 12 4Z" />
-          </svg>
-          {/* Battery */}
-          <div className="w-5 h-2.5 border border-current rounded-xs p-0.5 flex items-center">
-            <div className="w-full h-full bg-current rounded-xs" />
-          </div>
-        </div>
-      </div>
-
       {/* ERROR ALERT NOTIFICATION */}
       {errorMessage && (
         <div className="mx-4 mt-2 p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl text-xs font-semibold z-40 animate-fade-in shadow-sm">
@@ -509,10 +485,10 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
       {/* =================================================================== */}
       {step === 'welcome' && (
         <div className="w-full flex-1 flex flex-col justify-between relative text-white overflow-hidden">
-          {/* Background image matching user's uploaded design (Hargeisa night skyline & Somaliland flag building) */}
+          {/* Background image: Authentic Hargeisa night downtown skyline with Somaliland flag LED building */}
           <div className="absolute inset-0 z-0">
             <img
-              src="/images/wadaage_hero_hargeisa.jpg"
+              src="/images/hargeisa_night_flag.jpg"
               alt="Hargeisa Somaliland Night Skyline"
               className="w-full h-full object-cover object-center scale-105"
             />
@@ -525,7 +501,7 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
           <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-96 h-96 bg-[#00E575]/15 rounded-full blur-3xl pointer-events-none z-10" />
           <div className="absolute bottom-16 -right-10 w-72 h-72 bg-[#00A3FF]/20 rounded-full blur-3xl pointer-events-none z-10" />
 
-          {/* Top Bar with Location, Language & Role Switcher */}
+          {/* Top Bar with Location, Language & Dedicated Rider App Badge */}
           <div className="px-5 pt-3 pb-1 flex items-center justify-between z-20">
             {/* Location Pill */}
             <div className="flex items-center space-x-1.5 px-3 py-1 rounded-full bg-black/35 backdrop-blur-md border border-white/15 text-[11px] font-bold">
@@ -534,54 +510,30 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
             </div>
 
             <div className="flex items-center space-x-2">
-              {/* Language Switch */}
+              {/* Language Switch with Authentic Somaliland Flag */}
               <button
                 type="button"
                 onClick={() => setLanguage(language === 'so' ? 'en' : 'so')}
-                className="text-[11px] font-black px-2.5 py-1 bg-black/30 hover:bg-black/50 rounded-full border border-white/20 transition cursor-pointer"
+                className="flex items-center space-x-1.5 text-[11px] font-black px-2.5 py-1 bg-black/40 hover:bg-black/60 rounded-full border border-white/20 transition cursor-pointer"
                 title="Bedel Luqadda"
               >
-                {language === 'so' ? '🇸🇴 SO' : '🇬🇧 EN'}
+                {language === 'so' ? (
+                  <>
+                    <SomalilandFlag className="w-4 h-2.5 rounded-xs" />
+                    <span>SO</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-xs">🇬🇧</span>
+                    <span>EN</span>
+                  </>
+                )}
               </button>
 
-              {/* Role Switcher Menu */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShowRoleMenu(!showRoleMenu)}
-                  className="flex items-center space-x-1 text-[11px] font-black px-2.5 py-1 bg-[#00E575]/20 text-[#00E575] hover:bg-[#00E575]/30 rounded-full border border-[#00E575]/40 transition cursor-pointer"
-                >
-                  <User className="w-3 h-3" />
-                  <span>Rider</span>
-                  <ChevronDown className="w-3 h-3" />
-                </button>
-
-                {showRoleMenu && (
-                  <div className="absolute right-0 top-full mt-1.5 w-36 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl p-1 z-50 text-xs animate-in fade-in zoom-in-95">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowRoleMenu(false);
-                        if (onSwitchToDriver) onSwitchToDriver();
-                      }}
-                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-200 font-bold flex items-center space-x-2 transition"
-                    >
-                      <Car className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Darawal (Driver)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowRoleMenu(false);
-                        if (onSwitchToAdmin) onSwitchToAdmin();
-                      }}
-                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800 text-slate-200 font-bold flex items-center space-x-2 transition"
-                    >
-                      <Shield className="w-3.5 h-3.5 text-blue-400" />
-                      <span>Maamul (Admin)</span>
-                    </button>
-                  </div>
-                )}
+              {/* Dedicated Rider App Badge - No Switcher */}
+              <div className="flex items-center space-x-1 text-[11px] font-black px-2.5 py-1 bg-[#00E575]/20 text-[#00E575] rounded-full border border-[#00E575]/40 shadow-xs">
+                <User className="w-3 h-3" />
+                <span>Rider App</span>
               </div>
             </div>
           </div>
@@ -1180,10 +1132,10 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
       {/* =================================================================== */}
       {step === 'signin' && (
         <div className="w-full flex-1 flex flex-col justify-between relative text-white overflow-y-auto no-scrollbar">
-          {/* Background image matching user's uploaded design */}
+          {/* Background image: Authentic Hargeisa night downtown skyline */}
           <div className="absolute inset-0 z-0">
             <img
-              src="/images/wadaage_hero_hargeisa.jpg"
+              src="/images/hargeisa_night_flag.jpg"
               alt="Hargeisa Somaliland Night Skyline"
               className="w-full h-full object-cover object-center scale-105"
             />
@@ -1209,9 +1161,19 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
             <button
               type="button"
               onClick={() => setLanguage(language === 'so' ? 'en' : 'so')}
-              className="text-[11px] font-black px-2.5 py-1 bg-black/30 hover:bg-black/50 rounded-full border border-white/20 transition cursor-pointer"
+              className="flex items-center space-x-1.5 text-[11px] font-black px-2.5 py-1 bg-black/40 hover:bg-black/60 rounded-full border border-white/20 transition cursor-pointer"
             >
-              {language === 'so' ? '🇸🇴 SO' : '🇬🇧 EN'}
+              {language === 'so' ? (
+                <>
+                  <SomalilandFlag className="w-4 h-2.5 rounded-xs" />
+                  <span>SO</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-xs">🇬🇧</span>
+                  <span>EN</span>
+                </>
+              )}
             </button>
           </div>
 

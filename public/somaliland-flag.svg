@@ -1,0 +1,11 @@
+<svg viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Somaliland Flag">
+  <title>Calanka Somaliland / Somaliland Flag</title>
+  <defs>
+    <polygon id="star" points="0,-38 11.2,-11.7 39.9,-11.7 16.7,5.2 25.5,32.3 0,15.5 -25.5,32.3 -16.7,5.2 -39.9,-11.7 -11.2,-11.7" fill="#000000"/>
+  </defs>
+  <rect x="0" y="0" width="600" height="133.33" fill="#128043"/>
+  <text x="300" y="84" fill="#FFFFFF" text-anchor="middle" font-family="'Scheherazade New', 'Amiri', 'Traditional Arabic', 'Noto Naskh Arabic', sans-serif" font-size="46" font-weight="700">لَا إِلٰهَ إِلَّا الله مُحَمَّدٌ رَسُولُ الله</text>
+  <rect x="0" y="133.33" width="600" height="133.33" fill="#FFFFFF"/>
+  <g transform="translate(300, 200)"><use href="#star"/></g>
+  <rect x="0" y="266.66" width="600" height="133.34" fill="#D21034"/>
+</svg>

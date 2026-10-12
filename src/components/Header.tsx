@@ -109,7 +109,7 @@ export const Header: React.FC<HeaderProps> = ({ onBackToWebsite, onNavigate }) =
               className="bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 px-2.5 py-1.5 rounded-xl text-xs font-black flex items-center space-x-1.5 hover:bg-emerald-500/30 transition-all shadow-sm"
               title="Switch Language (English / Somali)"
             >
-              {language === 'en' ? (
+              {language === 'so' ? (
                 <>
                   <SomalilandFlag className="w-4 h-2.5 rounded-xs" />
                   <span>SOMALI</span>

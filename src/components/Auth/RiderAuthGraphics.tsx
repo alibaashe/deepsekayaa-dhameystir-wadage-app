@@ -442,8 +442,8 @@ export const HeroHargeisaCarScene: React.FC<{ className?: string }> = ({ classNa
       {/* Background authentic Hargeisa city panoramic photo with rich gradient overlay */}
       <div className="absolute inset-0 z-0">
         <img
-          src="/images/wadaage_hero_hargeisa.jpg"
-          alt="Hargeisa Somaliland"
+          src="/images/hargeisa_night_flag.jpg"
+          alt="Hargeisa Somaliland Night Skyline"
           className="w-full h-full object-cover object-center scale-105 group-hover:scale-100 transition-transform duration-1000 ease-out"
           onError={(e) => {
             // Fallback gradient if file missing

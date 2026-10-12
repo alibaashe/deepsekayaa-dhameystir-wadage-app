@@ -368,14 +368,27 @@ export const DriverApprovalTable: React.FC = React.memo(() => {
         {driverApplications.length === 0 ? (
           <p className="text-xs text-slate-500 text-center py-6">No driver applications submitted yet.</p>
         ) : (
-          driverApplications.map((app, idx) => {
-            const isApproved = app.status === 'approved';
-            const isHold = app.status === 'on_hold' || (app.status as string) === 'hold';
-            const isRejected = app.status === 'rejected';
+          driverApplications
+            .filter((app) => app && (app.fullName || app.phone))
+            .map((app, idx) => {
+              const isApproved = app.status === 'approved';
+              const isHold = app.status === 'on_hold' || (app.status as string) === 'hold';
+              const isRejected = app.status === 'rejected';
+              const fullName = app.fullName || 'Wadaage Driver';
+              const phone = app.phone || '';
+              const address = app.address || 'Hargeysa';
+              const guarantorName = app.guarantor?.fullName || app.guarantor?.name || 'Guarantor Name';
+              const guarantorPhone = app.guarantor?.phone || '';
+              const guarantorRel = app.guarantor?.relationship || '';
+              const guarantorAddr = app.guarantor?.address || '';
+              const vehicleCat = app.vehicle?.category || 'wadaage_taxi';
+              const vehicleModel = app.vehicle?.model || 'Toyota';
+              const vehicleColor = app.vehicle?.color || 'White';
+              const vehiclePlate = app.vehicle?.licensePlate || 'SL-0000';
 
-            return (
+              return (
               <div
-                key={`app_${app.id || app.phone || idx}_${idx}`}
+                key={`app_${app.id || phone || idx}_${idx}`}
                 className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3 text-xs"
               >
                 {/* Main Summary Bar */}
@@ -383,12 +396,12 @@ export const DriverApprovalTable: React.FC = React.memo(() => {
                   <div className="flex items-center space-x-3">
                     <img
                       src={app.driverPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
-                      alt={app.fullName}
+                      alt={fullName}
                       className="w-12 h-12 rounded-2xl object-cover border-2 border-amber-400 shrink-0"
                     />
                     <div>
                       <div className="flex items-center space-x-2">
-                        <span className="font-extrabold text-sm text-slate-900 dark:text-white">{app.fullName}</span>
+                        <span className="font-extrabold text-sm text-slate-900 dark:text-white">{fullName}</span>
                         <span
                           className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
                             isApproved
@@ -400,13 +413,13 @@ export const DriverApprovalTable: React.FC = React.memo(() => {
                               : 'bg-blue-500/20 text-blue-600 dark:text-blue-400'
                           }`}
                         >
-                          {app.status}
+                          {app.status || 'pending'}
                         </span>
                       </div>
                       <p className="text-slate-500 flex items-center space-x-2 mt-0.5">
-                        <span className="font-mono font-bold text-amber-600">{app.phone}</span>
+                        <span className="font-mono font-bold text-amber-600">{phone}</span>
                         <span>•</span>
-                        <span>{app.address}</span>
+                        <span>{address}</span>
                       </p>
                     </div>
                   </div>
@@ -422,7 +435,7 @@ export const DriverApprovalTable: React.FC = React.memo(() => {
                     </button>
 
                     <button
-                      onClick={() => handleStatusChange(app.id, 'approved', app.fullName)}
+                      onClick={() => handleStatusChange(app.id, 'approved', fullName)}
                       disabled={isApproved}
                       className={`px-3 py-1.5 rounded-xl font-black text-xs uppercase flex items-center space-x-1 cursor-pointer transition ${
                         isApproved
@@ -448,7 +461,7 @@ export const DriverApprovalTable: React.FC = React.memo(() => {
                     </button>
 
                     <button
-                      onClick={() => handleStatusChange(app.id, 'rejected', app.fullName, 'Incomplete documents')}
+                      onClick={() => handleStatusChange(app.id, 'rejected', fullName, 'Incomplete documents')}
                       disabled={isRejected}
                       className={`px-3 py-1.5 rounded-xl font-black text-xs uppercase flex items-center space-x-1 shadow-md cursor-pointer transition ${
                         isRejected
@@ -463,7 +476,7 @@ export const DriverApprovalTable: React.FC = React.memo(() => {
                     {confirmDeleteId === app.id ? (
                       <div className="flex items-center space-x-1 bg-rose-950/60 p-1 rounded-xl border border-rose-500/40">
                         <button
-                          onClick={() => handleDelete(app.id, app.fullName)}
+                          onClick={() => handleDelete(app.id, fullName)}
                           className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white font-black text-[10px] rounded-lg"
                         >
                           Confirm
@@ -498,10 +511,10 @@ export const DriverApprovalTable: React.FC = React.memo(() => {
                         <span>Dammaanad-qaade (Guarantor)</span>
                       </span>
                       <div className="text-[11px] space-y-1 text-slate-700 dark:text-slate-300">
-                        <p><strong>Name:</strong> {app.guarantor.fullName}</p>
-                        <p><strong>Phone:</strong> <span className="font-mono font-bold text-amber-600">{app.guarantor.phone}</span></p>
-                        <p><strong>Relation:</strong> {app.guarantor.relationship}</p>
-                        <p><strong>Address:</strong> {app.guarantor.address}</p>
+                        <p><strong>Name:</strong> {guarantorName}</p>
+                        <p><strong>Phone:</strong> <span className="font-mono font-bold text-amber-600">{guarantorPhone}</span></p>
+                        <p><strong>Relation:</strong> {guarantorRel}</p>
+                        <p><strong>Address:</strong> {guarantorAddr}</p>
                       </div>
                     </div>
 
@@ -512,8 +525,8 @@ export const DriverApprovalTable: React.FC = React.memo(() => {
                         <span>Somaliland ID & Password</span>
                       </span>
                       <div className="text-[11px] space-y-1">
-                        <p><strong>SL ID No:</strong> <span className="font-mono font-bold">{app.somalilandIdNumber}</span></p>
-                        <p><strong>License No:</strong> <span className="font-mono font-bold">{app.somalilandLicenseNumber}</span></p>
+                        <p><strong>SL ID No:</strong> <span className="font-mono font-bold">{app.somalilandIdNumber || 'N/A'}</span></p>
+                        <p><strong>License No:</strong> <span className="font-mono font-bold">{app.somalilandLicenseNumber || 'N/A'}</span></p>
                         <p>
                           <strong>Driver Password:</strong>{' '}
                           <span className="font-mono font-bold text-emerald-500">
@@ -569,15 +582,17 @@ export const DriverApprovalTable: React.FC = React.memo(() => {
                             <KeyRound className="w-3 h-3" />
                             <span>Set / Reset Password</span>
                           </button>
-                          <a
-                            href={app.somalilandIdPhoto}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="px-2 py-1 bg-amber-400 text-slate-950 font-bold rounded text-[10px] flex items-center space-x-1"
-                          >
-                            <span>SL ID</span>
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
+                          {app.somalilandIdPhoto && (
+                            <a
+                              href={app.somalilandIdPhoto}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-2 py-1 bg-amber-400 text-slate-950 font-bold rounded text-[10px] flex items-center space-x-1"
+                            >
+                              <span>SL ID</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          )}
                         </div>
                       )}
                     </div>
@@ -589,9 +604,9 @@ export const DriverApprovalTable: React.FC = React.memo(() => {
                         <span>Vehicle Specs</span>
                       </span>
                       <div className="text-[11px] space-y-1">
-                        <p><strong>Category:</strong> <span className="uppercase font-bold text-amber-600">{app.vehicle.category}</span></p>
-                        <p><strong>Model:</strong> {app.vehicle.model} ({app.vehicle.color})</p>
-                        <p><strong>Plate:</strong> <span className="font-mono font-bold">{app.vehicle.licensePlate}</span></p>
+                        <p><strong>Category:</strong> <span className="uppercase font-bold text-amber-600">{vehicleCat}</span></p>
+                        <p><strong>Model:</strong> {vehicleModel} ({vehicleColor})</p>
+                        <p><strong>Plate:</strong> <span className="font-mono font-bold">{vehiclePlate}</span></p>
                       </div>
                     </div>
 

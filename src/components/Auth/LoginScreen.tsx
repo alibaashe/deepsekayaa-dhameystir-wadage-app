@@ -139,16 +139,6 @@ export const LoginScreen: React.FC = () => {
   // Selected role is locked directly to the active standalone application
   const selectedRole: UserRole = role || 'passenger';
 
-  // For Rider role, render the modern 6-screen Wadaage Share onboarding & login flow
-  if ((selectedRole as string) === 'passenger') {
-    return (
-      <RiderAuthFlow
-        onSwitchToDriver={() => setRole('driver')}
-        onSwitchToAdmin={() => setRole('admin')}
-      />
-    );
-  }
-
   const [isRegisterMode, setIsRegisterMode] = useState(true);
   const [showDriverKycModal, setShowDriverKycModal] = useState(false);
 
@@ -186,6 +176,11 @@ export const LoginScreen: React.FC = () => {
       if (interval) clearInterval(interval);
     };
   }, [showOtpStep, otpTimer]);
+
+  // For Rider role, render the modern 6-screen Wadaage Share onboarding & login flow
+  if ((selectedRole as string) === 'passenger') {
+    return <RiderAuthFlow />;
+  }
 
   // Handle OTP Verification Submit
   const handleVerifyOtpSubmit = async (e: React.FormEvent) => {

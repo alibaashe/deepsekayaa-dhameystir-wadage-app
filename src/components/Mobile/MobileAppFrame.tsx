@@ -145,34 +145,9 @@ export const MobileAppFrame: React.FC<MobileAppFrameProps> = ({ onOpenSafetyModa
   return (
     <div className="flex justify-center items-center py-2 sm:py-6 bg-slate-950/60 min-h-[700px]">
       {/* Smartphone Device Body Outer Shell */}
-      <div className="relative w-full max-w-[390px] h-[800px] bg-slate-900 rounded-[48px] p-3 shadow-2xl border-[10px] border-slate-800 ring-1 ring-slate-700/50 flex flex-col overflow-hidden selection:bg-emerald-500">
-
-        {/* Dynamic Notch & Status Bar */}
-        <div className="absolute top-0 left-0 right-0 z-40 bg-[#00B14F] pt-2.5 pb-2 px-4 flex justify-between items-center text-white text-xs font-semibold">
-          {/* Clock or Title Badge */}
-          {titleLabel ? (
-            <span className="bg-slate-950 text-emerald-400 text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wide shadow">
-              {titleLabel}
-            </span>
-          ) : (
-            <span className="font-bold text-[13px] tracking-tight">12:30</span>
-          )}
-
-          {/* Center Camera Punchhole Notch */}
-          <div className="w-20 h-4 bg-slate-950 rounded-full border border-slate-800 flex items-center justify-center">
-            <div className="w-2.5 h-2.5 bg-slate-900 rounded-full border border-slate-800"></div>
-          </div>
-
-          {/* Indicators */}
-          <div className="flex items-center space-x-1.5 text-white">
-            <Signal className="w-3.5 h-3.5" />
-            <Wifi className="w-3.5 h-3.5" />
-            <Battery className="w-4 h-4 fill-white" />
-          </div>
-        </div>
-
+      <div className="relative w-full max-w-[420px] h-[820px] bg-slate-900 rounded-[44px] p-2 shadow-2xl border-[6px] border-slate-800 ring-1 ring-slate-700/50 flex flex-col overflow-hidden selection:bg-emerald-500">
         {/* Wadaage Brand Header */}
-        <div className="relative z-30 bg-[#06172e] text-white pt-8 pb-2.5 px-3 flex items-center justify-between shadow-md border-b border-slate-800">
+        <div className="relative z-30 bg-[#06172e] text-white pt-2.5 pb-2.5 px-3 flex items-center justify-between shadow-md border-b border-slate-800">
           <div className="flex items-center space-x-2">
             <button
               onClick={() => setShowInfoModal(true)}

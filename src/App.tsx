@@ -98,10 +98,10 @@ const MainAppContent: React.FC = () => {
         return 'rider';
       }
 
-      // 5. Default root domain (wadaage.com /) is the Welcome Website!
-      return 'website';
+      // 5. Default root domain is the dedicated Rider Mobile App!
+      return 'rider';
     } catch {
-      return 'website';
+      return 'rider';
     }
   };
 
@@ -393,28 +393,12 @@ const MainAppContent: React.FC = () => {
         <div className="w-full max-w-md mb-4 flex items-center justify-between">
           <button
             type="button"
-            onClick={() => navigateTo('website')}
+            onClick={() => navigateTo('rider')}
             className="text-xs font-bold text-emerald-400 hover:text-emerald-300 flex items-center space-x-1.5 bg-slate-900/60 hover:bg-slate-900 px-3 py-1.5 rounded-xl border border-emerald-500/30 transition cursor-pointer"
           >
             <span>&larr;</span>
-            <span>wadaage.com</span>
+            <span>Rider App</span>
           </button>
-          <div className="flex items-center space-x-2">
-            <button
-              type="button"
-              onClick={() => navigateTo('rider')}
-              className="text-[11px] font-bold text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-900/40 hover:bg-slate-800 transition cursor-pointer"
-            >
-              Rider
-            </button>
-            <button
-              type="button"
-              onClick={() => navigateTo('driver')}
-              className="text-[11px] font-bold text-amber-400 hover:text-amber-300 px-2.5 py-1 rounded-lg bg-slate-900/40 hover:bg-slate-800 transition cursor-pointer"
-            >
-              Driver
-            </button>
-          </div>
         </div>
         <div className="max-w-md w-full bg-[#002418] border border-[#00E575]/30 rounded-3xl p-6 shadow-2xl">
           <LoginScreen />
