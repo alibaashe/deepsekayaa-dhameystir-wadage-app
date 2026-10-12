@@ -204,6 +204,8 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
   const dragStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const centerStartRef = useRef<{ lat: number; lng: number }>({ lat: 9.5600, lng: 44.0650 });
   const hasMovedRef = useRef(false);
+  const pinchStartDistRef = useRef<number | null>(null);
+  const pinchStartZoomRef = useRef<number>(14);
 
   // Dimensions
   const [dimensions, setDimensions] = useState<{ width: number; height: number }>({
@@ -470,19 +472,9 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     }
   };
 
-  // Convert Lat/Lng to Container Screen Pixel coordinates
+  // Convert Lat/Lng to Container Screen Pixel coordinates (Spherical Mercator EPSG:3857)
   const toScreenCoord = useCallback(
     (lat: number, lng: number) => {
-      if (overlayProjection && window.google && googleMapInstanceRef.current) {
-        try {
-          const latLng = new google.maps.LatLng(lat, lng);
-          const point = overlayProjection.fromLatLngToContainerPixel(latLng);
-          if (point) {
-            return { x: point.x, y: point.y };
-          }
-        } catch (_e) {}
-      }
-
       const centerPixel = latLngToPixel(center.lat, center.lng, zoom);
       const p = latLngToPixel(lat, lng, zoom);
       return {
@@ -490,7 +482,7 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
         y: p.y - centerPixel.y + dimensions.height / 2,
       };
     },
-    [overlayProjection, center.lat, center.lng, zoom, dimensions.width, dimensions.height]
+    [center.lat, center.lng, zoom, dimensions.width, dimensions.height]
   );
 
   // Real Road Route Path Points
@@ -598,14 +590,14 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
 
   const fallbackGoogleTiles = useMemo(() => {
     const list: Array<{ x: number; y: number; left: number; top: number; key: string; url: string; fallbackUrl: string }> = [];
-    const minX = Math.max(0, Math.min(minTile.x, maxTile.x) - 1);
-    const maxX = Math.max(minTile.x, maxTile.x) + 1;
-    const minY = Math.max(0, Math.min(minTile.y, maxTile.y) - 1);
-    const maxY = Math.max(minTile.y, maxTile.y) + 1;
+    const minX = Math.max(0, Math.min(minTile.x, maxTile.x) - 2);
+    const maxX = Math.max(minTile.x, maxTile.x) + 2;
+    const minY = Math.max(0, Math.min(minTile.y, maxTile.y) - 2);
+    const maxY = Math.max(minTile.y, maxTile.y) + 2;
 
     let lyr = 'm'; // roadmap
     if (mapLayer === 'satellite') lyr = 'y'; // hybrid/satellite
-    else if (mapLayer === 'dark') lyr = 'p'; // terrain/dark
+    else if (mapLayer === 'dark') lyr = 'm'; // dark styled via CSS filter
 
     for (let tx = minX; tx <= maxX; tx++) {
       for (let ty = minY; ty <= maxY; ty++) {
@@ -615,8 +607,8 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
         const screenY = tilePixelY - centerPixel.y + dimensions.height / 2;
 
         const sub = (Math.abs(tx + ty) % 4);
-        const url = `https://mts${sub}.google.com/vt/lyrs=${lyr}&x=${tx}&y=${ty}&z=${zoom}`;
-        const fallbackUrl = `https://mts0.google.com/vt/lyrs=${lyr}&x=${tx}&y=${ty}&z=${zoom}`;
+        const url = `https://mt${sub}.google.com/vt/lyrs=${lyr}&hl=en&gl=SO&x=${tx}&y=${ty}&z=${zoom}`;
+        const fallbackUrl = `https://mts${sub}.google.com/vt/lyrs=${lyr}&hl=en&gl=SO&x=${tx}&y=${ty}&z=${zoom}`;
 
         list.push({
           x: tx,
@@ -632,9 +624,8 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     return list;
   }, [zoom, minTile, maxTile, centerPixel, dimensions, mapLayer]);
 
-  // Touch and Mouse fallback interaction
+  // Touch and Mouse interaction (Always responsive, zero blank screens)
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (isSdkLoaded) return;
     isDraggingRef.current = true;
     hasMovedRef.current = false;
     dragStartRef.current = { x: e.clientX, y: e.clientY };
@@ -642,7 +633,7 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (isSdkLoaded || !isDraggingRef.current) return;
+    if (!isDraggingRef.current) return;
     const dx = e.clientX - dragStartRef.current.x;
     const dy = e.clientY - dragStartRef.current.y;
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasMovedRef.current = true;
@@ -654,7 +645,6 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
   };
 
   const handleMouseUp = (e: React.MouseEvent) => {
-    if (isSdkLoaded) return;
     if (!hasMovedRef.current && isDraggingRef.current && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
       const clickX = e.clientX - rect.left;
@@ -671,16 +661,40 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (isSdkLoaded || e.touches.length !== 1) return;
-    const touch = e.touches[0];
-    isDraggingRef.current = true;
-    hasMovedRef.current = false;
-    dragStartRef.current = { x: touch.clientX, y: touch.clientY };
-    centerStartRef.current = { ...center };
+    if (e.touches.length === 2) {
+      isDraggingRef.current = false;
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      pinchStartDistRef.current = dist;
+      pinchStartZoomRef.current = zoom;
+      return;
+    }
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      isDraggingRef.current = true;
+      hasMovedRef.current = false;
+      dragStartRef.current = { x: touch.clientX, y: touch.clientY };
+      centerStartRef.current = { ...center };
+    }
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (isSdkLoaded || !isDraggingRef.current || e.touches.length !== 1) return;
+    if (e.touches.length === 2 && pinchStartDistRef.current !== null) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const diff = dist - pinchStartDistRef.current;
+      if (Math.abs(diff) > 25) {
+        const zoomDelta = Math.round(diff / 50);
+        const newZoom = Math.max(11, Math.min(19, pinchStartZoomRef.current + zoomDelta));
+        setZoom(newZoom);
+      }
+      return;
+    }
+    if (!isDraggingRef.current || e.touches.length !== 1) return;
     const touch = e.touches[0];
     const dx = touch.clientX - dragStartRef.current.x;
     const dy = touch.clientY - dragStartRef.current.y;
@@ -692,13 +706,27 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     setCenter(newLatLng);
   };
 
-  const handleTouchEnd = () => {
-    if (isSdkLoaded) return;
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (pinchStartDistRef.current !== null) {
+      pinchStartDistRef.current = null;
+    }
+    if (!hasMovedRef.current && isDraggingRef.current && e.changedTouches.length === 1 && containerRef.current) {
+      const touch = e.changedTouches[0];
+      const rect = containerRef.current.getBoundingClientRect();
+      const clickX = touch.clientX - rect.left;
+      const clickY = touch.clientY - rect.top;
+      const centerP = latLngToPixel(center.lat, center.lng, zoom);
+      const targetPixel = {
+        x: centerP.x + (clickX - dimensions.width / 2),
+        y: centerP.y + (clickY - dimensions.height / 2),
+      };
+      const clickedLatLng = pixelToLatLng(targetPixel.x, targetPixel.y, zoom);
+      handleLocationSelect(clickedLatLng.lat, clickedLatLng.lng);
+    }
     isDraggingRef.current = false;
   };
 
   const handleWheel = (e: React.WheelEvent) => {
-    if (isSdkLoaded) return;
     e.preventDefault();
     if (e.deltaY < 0) {
       setZoom((z) => Math.min(19, z + 1));
@@ -739,36 +767,35 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
       onTouchEnd={handleTouchEnd}
       onWheel={handleWheel}
     >
-      {/* 1. Real Google Maps Native Container */}
+      {/* 1. High-Clarity Google Maps Live Direct Tile Engine (Hargeisa, Somaliland) - ALWAYS RESILIENT */}
       <div
-        ref={mapDomRef}
-        className="absolute inset-0 w-full h-full z-0"
-        style={{ opacity: isSdkLoaded ? 1 : 0, transition: 'opacity 0.3s ease' }}
-      />
-
-      {/* 2. High-Clarity Slippy Raster Tiles (Hargeisa, Somaliland) */}
-      {!isSdkLoaded && (
-        <div className="absolute inset-0 pointer-events-none z-0">
-          {fallbackGoogleTiles.map((t) => (
-            <img
-              key={t.key}
-              src={t.url}
-              alt="hargeisa-map-tile"
-              loading="eager"
-              onError={(e) => {
-                if (t.fallbackUrl && e.currentTarget.src !== t.fallbackUrl) {
-                  e.currentTarget.src = t.fallbackUrl;
-                }
-              }}
-              className="absolute w-[256px] h-[256px] select-none pointer-events-none"
-              style={{
-                left: `${t.left}px`,
-                top: `${t.top}px`,
-              }}
-            />
-          ))}
-        </div>
-      )}
+        className="absolute inset-0 pointer-events-none z-0 overflow-hidden"
+        style={{
+          filter:
+            mapLayer === 'dark'
+              ? 'brightness(0.78) invert(0.92) hue-rotate(185deg) contrast(1.15) saturate(1.1)'
+              : undefined,
+        }}
+      >
+        {fallbackGoogleTiles.map((t) => (
+          <img
+            key={t.key}
+            src={t.url}
+            alt="google-map-tile"
+            loading="eager"
+            onError={(e) => {
+              if (t.fallbackUrl && e.currentTarget.src !== t.fallbackUrl) {
+                e.currentTarget.src = t.fallbackUrl;
+              }
+            }}
+            className="absolute w-[256px] h-[256px] select-none pointer-events-none"
+            style={{
+              left: `${t.left}px`,
+              top: `${t.top}px`,
+            }}
+          />
+        ))}
+      </div>
 
       {/* Official Google Maps Watermark & Copyright Attribution */}
       <div className="absolute bottom-2 left-2 z-20 pointer-events-none bg-black/60 backdrop-blur-sm text-white px-2.5 py-1 rounded-md text-[10px] font-sans flex items-center space-x-1.5 border border-white/10 shadow">

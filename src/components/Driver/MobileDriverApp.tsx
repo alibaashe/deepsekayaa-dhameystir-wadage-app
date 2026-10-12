@@ -136,6 +136,9 @@ export const MobileDriverApp: React.FC = () => {
     meterSeconds: liveMeterSeconds,
     meterFareUsd: liveCalculatedFareUsd,
     isMeterRunning: isLiveMeterRunning,
+    language,
+    setLanguage,
+    t,
   } = useRide();
 
   // Active View Tab: 'home' | 'my_rides' | 'fuel' | 'earnings' | 'profile' | 'active_ride' | 'settings'
@@ -2787,6 +2790,28 @@ export const MobileDriverApp: React.FC = () => {
                     })()}
                   </p>
                 </div>
+              </div>
+
+              {/* Language Switch Row */}
+              <div className="p-3 bg-slate-800/80 rounded-xl flex items-center justify-between border border-slate-700/60">
+                <span className="text-xs font-bold text-slate-300">Luqadda / Language</span>
+                <button
+                  type="button"
+                  onClick={() => setLanguage(language === 'so' ? 'en' : 'so')}
+                  className="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-white text-xs font-black rounded-lg shadow-xs border border-slate-600 flex items-center space-x-1.5 transition cursor-pointer"
+                >
+                  {language === 'so' ? (
+                    <>
+                      <SomalilandFlag className="w-4 h-2.5 rounded-xs" />
+                      <span>Soomaali</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>🇬🇧</span>
+                      <span>English</span>
+                    </>
+                  )}
+                </button>
               </div>
 
               {/* Navigation Links */}

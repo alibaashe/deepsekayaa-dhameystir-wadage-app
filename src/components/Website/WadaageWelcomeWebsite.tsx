@@ -172,10 +172,19 @@ export const WadaageWelcomeWebsite: React.FC<WadaageWelcomeWebsiteProps> = ({
               <button
                 type="button"
                 onClick={() => setLanguage(language === 'en' ? 'so' : 'en')}
-                className="bg-slate-900/80 hover:bg-slate-900 px-2.5 py-1 rounded-lg text-[11px] font-bold text-white flex items-center space-x-1.5 transition border border-emerald-500/40 cursor-pointer"
+                className="bg-slate-900/80 hover:bg-slate-900 px-2.5 py-1 rounded-lg text-[11px] font-bold text-white flex items-center space-x-1.5 transition border border-emerald-500/40 cursor-pointer shadow-xs"
               >
-                <Globe className="w-3 h-3 text-emerald-300" />
-                <span>{language === 'en' ? 'SOMALI' : 'ENGLISH'}</span>
+                {language === 'en' ? (
+                  <>
+                    <SomalilandFlag className="w-4 h-2.5 rounded-xs" />
+                    <span>SOOMAALI</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🇬🇧</span>
+                    <span>ENGLISH</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

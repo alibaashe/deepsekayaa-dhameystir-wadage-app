@@ -506,10 +506,20 @@ export const RiderAuthFlow: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setLanguage(language === 'so' ? 'en' : 'so')}
-                className="text-[11px] font-black px-2.5 py-1 bg-black/30 hover:bg-black/50 rounded-full border border-white/20 transition cursor-pointer"
+                className="text-[11px] font-black px-2.5 py-1 bg-black/30 hover:bg-black/50 rounded-full border border-white/20 transition cursor-pointer flex items-center space-x-1"
                 title="Bedel Luqadda"
               >
-                {language === 'so' ? '🇸🇴 SO' : '🇬🇧 EN'}
+                {language === 'so' ? (
+                  <>
+                    <SomalilandFlag className="w-3.5 h-2.5 rounded-xs" />
+                    <span>SO</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🇬🇧</span>
+                    <span>EN</span>
+                  </>
+                )}
               </button>
 
             </div>
@@ -1138,9 +1148,19 @@ export const RiderAuthFlow: React.FC = () => {
             <button
               type="button"
               onClick={() => setLanguage(language === 'so' ? 'en' : 'so')}
-              className="text-[11px] font-black px-2.5 py-1 bg-black/30 hover:bg-black/50 rounded-full border border-white/20 transition cursor-pointer"
+              className="text-[11px] font-black px-2.5 py-1 bg-black/30 hover:bg-black/50 rounded-full border border-white/20 transition cursor-pointer flex items-center space-x-1"
             >
-              {language === 'so' ? '🇸🇴 SO' : '🇬🇧 EN'}
+              {language === 'so' ? (
+                <>
+                  <SomalilandFlag className="w-3.5 h-2.5 rounded-xs" />
+                  <span>SO</span>
+                </>
+              ) : (
+                <>
+                  <span>🇬🇧</span>
+                  <span>EN</span>
+                </>
+              )}
             </button>
           </div>
 
