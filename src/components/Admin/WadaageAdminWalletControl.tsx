@@ -430,6 +430,7 @@ export const WadaageAdminWalletControl: React.FC = React.memo(() => {
           </div>
           <div>
             <div className="flex items-center space-x-2">
+              <WadaageLogo variant="icon" size="xs" appType="admin" />
               <WadaageLogo variant="wordmark" size="xs" appType="admin" />
               <span className="text-[10px] bg-emerald-500 text-slate-950 font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
                 Driver Wallet Control

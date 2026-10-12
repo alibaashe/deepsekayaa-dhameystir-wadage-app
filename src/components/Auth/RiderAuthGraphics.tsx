@@ -16,98 +16,14 @@ export const WadaageShareEmblem: React.FC<{
   return (
     <div className={`relative flex flex-col items-center justify-center shrink-0 select-none ${className}`}>
       <div className={`relative ${sizeMap[size]} flex items-center justify-center`}>
-        <svg
-          viewBox="0 0 200 200"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          className="w-full h-full drop-shadow-[0_4px_16px_rgba(0,102,255,0.35)] overflow-visible"
-        >
-          <defs>
-            <radialGradient id="badgeRadialBg" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#0B3060" />
-              <stop offset="65%" stopColor="#051B38" />
-              <stop offset="100%" stopColor="#031024" />
-            </radialGradient>
-            <linearGradient id="badgeBorderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#00E575" />
-              <stop offset="40%" stopColor="#00A3FF" />
-              <stop offset="100%" stopColor="#0052CC" />
-            </linearGradient>
-            <linearGradient id="limePinGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#76FF03" />
-              <stop offset="100%" stopColor="#00E575" />
-            </linearGradient>
-          </defs>
-
-          {/* Circular Navy Canvas */}
-          <circle cx="100" cy="100" r="92" fill="url(#badgeRadialBg)" />
-
-          {/* Outer Border Glowing Ring */}
-          <circle cx="100" cy="100" r="88" stroke="url(#badgeBorderGrad)" strokeWidth="4.5" />
-          <circle cx="100" cy="100" r="80" stroke="#00E575" strokeOpacity="0.3" strokeWidth="1.5" strokeDasharray="6 4" />
-
-          {/* Top Pin Over Car */}
-          <g transform="translate(100, 28)">
-            <path
-              d="M 0 0 C -7 0 -13 6 -13 13 C -13 22 0 35 0 35 C 0 35 13 22 13 13 C 13 6 7 0 0 0 Z"
-              fill="url(#limePinGrad)"
-            />
-            <circle cx="0" cy="12" r="4.5" fill="#051B38" />
-          </g>
-
-          {/* Car Graphic with 3 Passengers */}
-          <g transform="translate(100, 72)" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none">
-            {/* Car body chassis */}
-            <path
-              d="M -35 10 C -30 -3 -20 -10 -8 -11 L 8 -11 C 20 -10 30 -3 35 10 C 39 12 44 16 44 21 C 44 25 40 28 37 29 L 37 36 L 25 36 L 25 34 C 12 35 -12 35 -25 34 L -25 36 L -37 36 L -37 29 C -40 28 -44 25 -44 21 C -44 16 -39 12 -35 10 Z"
-              fill="#062248"
-            />
-            {/* Windshield divide */}
-            <path d="M -32 9 L 32 9" strokeWidth="2" />
-
-            {/* 3 Passenger Silhouette Circles */}
-            <circle cx="-16" cy="3" r="4.8" fill="#FFFFFF" />
-            <circle cx="0" cy="0" r="5.8" fill="#FFFFFF" />
-            <circle cx="16" cy="3" r="4.8" fill="#FFFFFF" />
-
-            {/* Headlights & bumper accents */}
-            <path d="M -37 22 C -33 23 -30 25 -28 28" stroke="#00E575" strokeWidth="2.5" />
-            <path d="M 37 22 C 33 23 30 25 28 28" stroke="#00E575" strokeWidth="2.5" />
-            <path d="M -12 28 L 12 28" stroke="#FFFFFF" strokeWidth="1.8" />
-          </g>
-
-          {/* Typography inside badge: "Wadaage" */}
-          <text
-            x="100"
-            y="136"
-            textAnchor="middle"
-            fontFamily="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif"
-            fontWeight="900"
-            fontSize="21"
-            fill="#FFFFFF"
-            letterSpacing="0.5"
-          >
-            Wadaage
-          </text>
-
-          {/* Subtitle inside badge: "— Share —" */}
-          <g transform="translate(100, 154)">
-            <line x1="-38" y1="-2" x2="-22" y2="-2" stroke="#00E575" strokeWidth="2" strokeLinecap="round" />
-            <text
-              x="0"
-              y="2"
-              textAnchor="middle"
-              fontFamily="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif"
-              fontWeight="900"
-              fontSize="12"
-              fill="#00E575"
-              letterSpacing="1.5"
-            >
-              Share
-            </text>
-            <line x1="22" y1="-2" x2="38" y2="-2" stroke="#00E575" strokeWidth="2" strokeLinecap="round" />
-          </g>
-        </svg>
+        <img
+          src="/riderlogo.png"
+          alt="Wadaage Share"
+          className="w-full h-full object-contain rounded-full drop-shadow-[0_4px_16px_rgba(0,102,255,0.35)] select-none pointer-events-none"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).src = '/logo.svg';
+          }}
+        />
       </div>
 
       {showText && (

@@ -601,11 +601,14 @@ export const MobileDriverApp: React.FC = () => {
                 <Menu className="w-5 h-5 text-slate-800" />
               </button>
 
-              <div className="flex flex-col items-center bg-white/95 backdrop-blur-md px-3.5 py-1 rounded-2xl shadow-md border border-slate-200/80">
-                <WadaageLogo variant="wordmark" size="sm" appType="driver" />
-                <span className="text-[9px] text-slate-500 font-bold tracking-tight">
-                  Safar wadaag, nolol wadaag.
-                </span>
+              <div className="flex items-center space-x-2 bg-white/95 backdrop-blur-md px-3 py-1 rounded-2xl shadow-md border border-slate-200/80">
+                <WadaageLogo variant="icon" size="xs" appType="driver" />
+                <div className="flex flex-col">
+                  <WadaageLogo variant="wordmark" size="xs" appType="driver" colorMode="dark" />
+                  <span className="text-[8px] text-slate-500 font-bold tracking-tight">
+                    Safar wadaag, nolol wadaag.
+                  </span>
+                </div>
               </div>
 
               <button

@@ -228,6 +228,7 @@ export const WadaageDriverWalletModal: React.FC<WadaageDriverWalletModalProps> =
             </div>
             <div>
               <div className="flex items-center space-x-2">
+                <WadaageLogo variant="icon" size="xs" appType="driver" />
                 <WadaageLogo variant="wordmark" size="xs" appType="driver" />
                 <span className="text-[9px] bg-emerald-500 text-slate-950 font-black px-2 py-0.5 rounded-full uppercase">
                   Wadaage Wallet
