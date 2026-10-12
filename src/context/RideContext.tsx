@@ -695,12 +695,12 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
     lat: 9.5605,
     lng: 44.0750,
   };
-  const defaultDropoff: LocationNode = CITY_LOCATIONS.find((p) => p.name.toLowerCase().includes('berbera') || p.id.includes('berbera')) || {
-    id: 'berbera_bus_terminal',
-    name: 'Berbera Bus Terminal (Istaanka Berbera)',
-    address: 'East Highway, 26 June District, Hargeisa',
-    lat: 9.5680,
-    lng: 44.0850,
+  const defaultDropoff: LocationNode = {
+    id: 'khayriya_square_core_station',
+    name: 'Khayriya Square Core Station',
+    address: 'Independence Ave & Central Hub, Hargeisa, Somaliland',
+    lat: 9.5600,
+    lng: 44.0650,
   };
 
   const [pickupLocation, setPickupLocation] = useState<LocationNode>(defaultPickup);

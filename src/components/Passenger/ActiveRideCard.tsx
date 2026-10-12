@@ -646,8 +646,8 @@ export const ActiveRideCard: React.FC<ActiveRideCardProps> = ({ onOpenSafetyModa
                 })()}
               </div>
 
-              {/* Cancel Button (Only if searching) */}
-              {(currentRide.status as string) === 'searching' && (
+              {/* Cancel Button (Available during searching, accepted, or driver_arrived - Hidden during in_progress / Safarka wuu socdaa) */}
+              {['searching', 'accepted', 'driver_arrived'].includes(currentRide.status) && (
                 <div className="text-center pt-1">
                   <button
                     type="button"

@@ -1515,7 +1515,7 @@ export const MobileDriverApp: React.FC = () => {
                     <span>GPS</span>
                   </button>
 
-                  {currentRide.status === 'accepted' && (
+                  {(currentRide.status === 'accepted' || currentRide.status === 'driver_arrived') && (
                     <button
                       type="button"
                       onClick={() => setShowTransferModal(true)}
