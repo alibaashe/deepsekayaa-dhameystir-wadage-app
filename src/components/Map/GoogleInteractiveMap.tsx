@@ -603,7 +603,9 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     const minY = Math.max(0, Math.min(minTile.y, maxTile.y) - 1);
     const maxY = Math.max(minTile.y, maxTile.y) + 1;
 
-    const subdomains = ['a', 'b', 'c', 'd'];
+    let lyr = 'm'; // roadmap
+    if (mapLayer === 'satellite') lyr = 'y'; // hybrid/satellite
+    else if (mapLayer === 'dark') lyr = 'p'; // terrain/dark
 
     for (let tx = minX; tx <= maxX; tx++) {
       for (let ty = minY; ty <= maxY; ty++) {
@@ -612,22 +614,16 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
         const screenX = tilePixelX - centerPixel.x + dimensions.width / 2;
         const screenY = tilePixelY - centerPixel.y + dimensions.height / 2;
 
-        const sub = subdomains[Math.abs(tx + ty) % subdomains.length];
-        let url = `https://${sub}.basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${tx}/${ty}.png`;
-        if (mapLayer === 'satellite') {
-          url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${ty}/${tx}`;
-        } else if (mapLayer === 'dark') {
-          url = `https://${sub}.basemaps.cartocdn.com/dark_all/${zoom}/${tx}/${ty}.png`;
-        }
-
-        const fallbackUrl = `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`;
+        const sub = (Math.abs(tx + ty) % 4);
+        const url = `https://mts${sub}.google.com/vt/lyrs=${lyr}&x=${tx}&y=${ty}&z=${zoom}`;
+        const fallbackUrl = `https://mts0.google.com/vt/lyrs=${lyr}&x=${tx}&y=${ty}&z=${zoom}`;
 
         list.push({
           x: tx,
           y: ty,
           left: screenX,
           top: screenY,
-          key: `map_${mapLayer}_${zoom}_${tx}_${ty}`,
+          key: `google_map_${mapLayer}_${zoom}_${tx}_${ty}`,
           url,
           fallbackUrl,
         });
@@ -773,6 +769,12 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
           ))}
         </div>
       )}
+
+      {/* Official Google Maps Watermark & Copyright Attribution */}
+      <div className="absolute bottom-2 left-2 z-20 pointer-events-none bg-black/60 backdrop-blur-sm text-white px-2.5 py-1 rounded-md text-[10px] font-sans flex items-center space-x-1.5 border border-white/10 shadow">
+        <span className="font-black tracking-tight text-blue-400">Google</span>
+        <span className="text-slate-400">Map data ©2026 Google</span>
+      </div>
 
       {/* 3. Real SVG Route Corridor Layer */}
       <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
