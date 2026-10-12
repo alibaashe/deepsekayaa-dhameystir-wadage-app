@@ -48,8 +48,16 @@ const MainAppContent: React.FC = () => {
       const pathname = window.location.pathname.toLowerCase();
       const hostname = window.location.hostname.toLowerCase();
 
-      // Explicit Admin (/admin or ?app=admin)
-      if (appParam === 'admin' || hash.includes('admin') || pathname === '/admin' || pathname.startsWith('/admin/') || hostname.startsWith('admin.')) {
+      // Explicit Admin (/adminkee or /adminkeerseaon or ?app=adminkee) - Hidden for security
+      if (
+        appParam === 'adminkee' ||
+        appParam === 'adminkeerseaon' ||
+        hash.includes('adminkee') ||
+        pathname === '/adminkee' ||
+        pathname.startsWith('/adminkee/') ||
+        pathname === '/adminkeerseaon' ||
+        pathname.startsWith('/adminkeerseaon/')
+      ) {
         try { localStorage.setItem('wadaage_app_view', 'admin'); } catch {}
         return 'admin';
       }

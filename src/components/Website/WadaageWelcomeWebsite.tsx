@@ -247,14 +247,7 @@ export const WadaageWelcomeWebsite: React.FC<WadaageWelcomeWebsiteProps> = ({
               <span>{language === 'so' ? 'Dalbo Wadaage' : 'Book a Ride'}</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => onNavigate('admin')}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition cursor-pointer"
-              title="wadaage.com/admin"
-            >
-              <Shield className="w-4 h-4 text-blue-400" />
-            </button>
+
           </div>
         </div>
       </header>
@@ -897,19 +890,7 @@ export const WadaageWelcomeWebsite: React.FC<WadaageWelcomeWebsiteProps> = ({
               </button>
             </div>
 
-            {/* Admin Portal Card */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 text-center space-y-2">
-              <Shield className="w-6 h-6 text-blue-400 mx-auto" />
-              <h3 className="font-extrabold text-sm text-white">wadaage.com/admin</h3>
-              <p className="text-[11px] text-slate-400">Xarunta Maamulka & Baaritaanka Fleet-ka</p>
-              <button
-                type="button"
-                onClick={() => onNavigate('admin')}
-                className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-black rounded-xl text-xs uppercase tracking-wider transition border border-slate-700 cursor-pointer"
-              >
-                Launch Admin Portal
-              </button>
-            </div>
+
           </div>
         </div>
       </section>
@@ -936,7 +917,6 @@ export const WadaageWelcomeWebsite: React.FC<WadaageWelcomeWebsiteProps> = ({
             <ul className="space-y-1.5 text-[11px]">
               <li><button onClick={() => onNavigate('rider')} className="hover:text-emerald-400 transition cursor-pointer">wadaage.com/rider (Rider App)</button></li>
               <li><button onClick={() => onNavigate('driver')} className="hover:text-emerald-400 transition cursor-pointer">wadaage.com/driver (Driver Partner)</button></li>
-              <li><button onClick={() => onNavigate('admin')} className="hover:text-emerald-400 transition cursor-pointer">wadaage.com/admin (Admin Portal)</button></li>
               <li><button onClick={() => onNavigate('website')} className="hover:text-emerald-400 transition cursor-pointer">wadaage.com/ (Home Website)</button></li>
             </ul>
           </div>
