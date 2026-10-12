@@ -227,10 +227,11 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     return () => window.removeEventListener('resize', updateSize);
   }, []);
 
-  // Listen to Google Maps auth failure
+  // Listen to Google Maps auth failure / referer restrictions
   useEffect(() => {
     const handleAuthFailure = () => {
       setIsSdkLoaded(false);
+      (window as any).__googleMapsAuthFailed = true;
       if (googleMapInstanceRef.current && mapDomRef.current) {
         try {
           mapDomRef.current.innerHTML = '';
@@ -238,16 +239,23 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
       }
     };
     window.addEventListener('gm_authFailure', handleAuthFailure);
-    return () => window.removeEventListener('gm_authFailure', handleAuthFailure);
+    window.addEventListener('google-maps-auth-failure', handleAuthFailure);
+    return () => {
+      window.removeEventListener('gm_authFailure', handleAuthFailure);
+      window.removeEventListener('google-maps-auth-failure', handleAuthFailure);
+    };
   }, []);
 
-  // Only load SDK if a non-empty key is present
+  // Only load SDK if a non-empty key is present and auth hasn't failed
   useEffect(() => {
     let mounted = true;
     if (GOOGLE_MAPS_KEY && !isSdkLoaded && !(window as any).__googleMapsAuthFailed) {
       loadGoogleMapsSdk(GOOGLE_MAPS_KEY).then((loaded) => {
-        if (mounted && loaded && window.google && window.google.maps) {
+        if (mounted && loaded && window.google && window.google.maps && !(window as any).__googleMapsAuthFailed) {
           setIsSdkLoaded(true);
+        } else {
+          (window as any).__googleMapsAuthFailed = true;
+          if (mounted) setIsSdkLoaded(false);
         }
       });
     }
@@ -595,7 +603,7 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
     const minY = Math.max(0, Math.min(minTile.y, maxTile.y) - 1);
     const maxY = Math.max(minTile.y, maxTile.y) + 1;
 
-    const subdomains = [0, 1, 2, 3];
+    const subdomains = ['a', 'b', 'c', 'd'];
 
     for (let tx = minX; tx <= maxX; tx++) {
       for (let ty = minY; ty <= maxY; ty++) {
@@ -604,24 +612,22 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
         const screenX = tilePixelX - centerPixel.x + dimensions.width / 2;
         const screenY = tilePixelY - centerPixel.y + dimensions.height / 2;
 
-        const subNum = subdomains[Math.abs(tx + ty) % subdomains.length];
-        // Official Google Maps direct tiles
-        let lyrParam = 'm'; // roadmap
+        const sub = subdomains[Math.abs(tx + ty) % subdomains.length];
+        let url = `https://${sub}.basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${tx}/${ty}.png`;
         if (mapLayer === 'satellite') {
-          lyrParam = 's'; // satellite
+          url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${ty}/${tx}`;
         } else if (mapLayer === 'dark') {
-          lyrParam = 'r'; // styled road / dark
+          url = `https://${sub}.basemaps.cartocdn.com/dark_all/${zoom}/${tx}/${ty}.png`;
         }
 
-        const url = `https://mt${subNum}.google.com/vt/lyrs=${lyrParam}&hl=en&x=${tx}&y=${ty}&z=${zoom}`;
-        const fallbackUrl = `https://mt${(subNum + 1) % 4}.google.com/vt/lyrs=${lyrParam}&hl=en&x=${tx}&y=${ty}&z=${zoom}`;
+        const fallbackUrl = `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`;
 
         list.push({
           x: tx,
           y: ty,
           left: screenX,
           top: screenY,
-          key: `gmap_${mapLayer}_${zoom}_${tx}_${ty}`,
+          key: `map_${mapLayer}_${zoom}_${tx}_${ty}`,
           url,
           fallbackUrl,
         });
@@ -969,23 +975,6 @@ export const GoogleInteractiveMap: React.FC<GoogleInteractiveMapProps> = ({
           >
             <Minus className="w-4 h-4" />
           </button>
-        </div>
-      </div>
-
-      {/* Official Google Maps Brand Watermark & Attribution */}
-      <div className="absolute bottom-1.5 left-2 z-20 pointer-events-none select-none">
-        <div className="bg-white/85 dark:bg-black/70 backdrop-blur-xs px-2 py-0.5 rounded-sm flex items-center space-x-1.5 shadow-xs border border-black/5 dark:border-white/10">
-          <span className="font-sans font-black text-xs tracking-tighter leading-none inline-flex items-center">
-            <span className="text-[#4285F4]">G</span>
-            <span className="text-[#EA4335]">o</span>
-            <span className="text-[#FBBC05]">o</span>
-            <span className="text-[#4285F4]">g</span>
-            <span className="text-[#34A853]">l</span>
-            <span className="text-[#EA4335]">e</span>
-          </span>
-          <span className="text-[9px] text-slate-600 dark:text-slate-300 font-medium tracking-tight">
-            Map data © Google
-          </span>
         </div>
       </div>
     </div>

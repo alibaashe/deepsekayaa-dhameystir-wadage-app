@@ -70,15 +70,7 @@ export type RiderAuthScreenStep =
   | 'success'   // Screen 5: Success ("Aad baad u wanaagsantahay!")
   | 'signin';   // Screen 6: Existing account login ("Gal Akoonka")
 
-interface RiderAuthFlowProps {
-  onSwitchToDriver?: () => void;
-  onSwitchToAdmin?: () => void;
-}
-
-export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
-  onSwitchToDriver,
-  onSwitchToAdmin,
-}) => {
+export const RiderAuthFlow: React.FC = () => {
   const {
     login,
     registerRider,
@@ -485,10 +477,10 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
       {/* =================================================================== */}
       {step === 'welcome' && (
         <div className="w-full flex-1 flex flex-col justify-between relative text-white overflow-hidden">
-          {/* Background image: Authentic Hargeisa night downtown skyline with Somaliland flag LED building */}
+          {/* Background image matching user's uploaded design (Hargeisa night skyline & Somaliland flag building) */}
           <div className="absolute inset-0 z-0">
             <img
-              src="/images/hargeisa_night_flag.jpg"
+              src="/images/wadaage_hero_hargeisa.jpg"
               alt="Hargeisa Somaliland Night Skyline"
               className="w-full h-full object-cover object-center scale-105"
             />
@@ -501,7 +493,7 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
           <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-96 h-96 bg-[#00E575]/15 rounded-full blur-3xl pointer-events-none z-10" />
           <div className="absolute bottom-16 -right-10 w-72 h-72 bg-[#00A3FF]/20 rounded-full blur-3xl pointer-events-none z-10" />
 
-          {/* Top Bar with Location, Language & Dedicated Rider App Badge */}
+          {/* Top Bar with Location, Language & Role Switcher */}
           <div className="px-5 pt-3 pb-1 flex items-center justify-between z-20">
             {/* Location Pill */}
             <div className="flex items-center space-x-1.5 px-3 py-1 rounded-full bg-black/35 backdrop-blur-md border border-white/15 text-[11px] font-bold">
@@ -510,31 +502,16 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
             </div>
 
             <div className="flex items-center space-x-2">
-              {/* Language Switch with Authentic Somaliland Flag */}
+              {/* Language Switch */}
               <button
                 type="button"
                 onClick={() => setLanguage(language === 'so' ? 'en' : 'so')}
-                className="flex items-center space-x-1.5 text-[11px] font-black px-2.5 py-1 bg-black/40 hover:bg-black/60 rounded-full border border-white/20 transition cursor-pointer"
+                className="text-[11px] font-black px-2.5 py-1 bg-black/30 hover:bg-black/50 rounded-full border border-white/20 transition cursor-pointer"
                 title="Bedel Luqadda"
               >
-                {language === 'so' ? (
-                  <>
-                    <SomalilandFlag className="w-4 h-2.5 rounded-xs" />
-                    <span>SO</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-xs">🇬🇧</span>
-                    <span>EN</span>
-                  </>
-                )}
+                {language === 'so' ? '🇸🇴 SO' : '🇬🇧 EN'}
               </button>
 
-              {/* Dedicated Rider App Badge - No Switcher */}
-              <div className="flex items-center space-x-1 text-[11px] font-black px-2.5 py-1 bg-[#00E575]/20 text-[#00E575] rounded-full border border-[#00E575]/40 shadow-xs">
-                <User className="w-3 h-3" />
-                <span>Rider App</span>
-              </div>
             </div>
           </div>
 
@@ -1132,10 +1109,10 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
       {/* =================================================================== */}
       {step === 'signin' && (
         <div className="w-full flex-1 flex flex-col justify-between relative text-white overflow-y-auto no-scrollbar">
-          {/* Background image: Authentic Hargeisa night downtown skyline */}
+          {/* Background image matching user's uploaded design */}
           <div className="absolute inset-0 z-0">
             <img
-              src="/images/hargeisa_night_flag.jpg"
+              src="/images/wadaage_hero_hargeisa.jpg"
               alt="Hargeisa Somaliland Night Skyline"
               className="w-full h-full object-cover object-center scale-105"
             />
@@ -1161,19 +1138,9 @@ export const RiderAuthFlow: React.FC<RiderAuthFlowProps> = ({
             <button
               type="button"
               onClick={() => setLanguage(language === 'so' ? 'en' : 'so')}
-              className="flex items-center space-x-1.5 text-[11px] font-black px-2.5 py-1 bg-black/40 hover:bg-black/60 rounded-full border border-white/20 transition cursor-pointer"
+              className="text-[11px] font-black px-2.5 py-1 bg-black/30 hover:bg-black/50 rounded-full border border-white/20 transition cursor-pointer"
             >
-              {language === 'so' ? (
-                <>
-                  <SomalilandFlag className="w-4 h-2.5 rounded-xs" />
-                  <span>SO</span>
-                </>
-              ) : (
-                <>
-                  <span className="text-xs">🇬🇧</span>
-                  <span>EN</span>
-                </>
-              )}
+              {language === 'so' ? '🇸🇴 SO' : '🇬🇧 EN'}
             </button>
           </div>
 

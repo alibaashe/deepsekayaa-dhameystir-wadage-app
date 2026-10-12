@@ -802,61 +802,76 @@ export const MobileDriverApp: React.FC = () => {
             </div>
           )}
 
-          {/* Active Radar Scanner Status Card when driver is online and waiting */}
-          {!incomingDriverRequest &&
-            driverModeOnline &&
-            (!currentRide || currentRide.status === 'searching' || currentRide.status === 'idle') && (
-              <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-4 rounded-3xl border border-slate-700 shadow-xl space-y-3 animate-fadeIn">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2.5">
-                    <span className="relative flex h-3.5 w-3.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500"></span>
-                    </span>
-                    <div>
-                      <h4 className="font-extrabold text-sm text-white flex items-center gap-1.5">
-                        <span>Radar-ka Wuu Shaqaynayaa</span>
-                        <span className="text-[10px] text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-700/60 font-mono">
-                          LIVE
-                        </span>
-                      </h4>
-                      <p className="text-[11px] text-slate-300">
-                        Raadinta dalabyada u dhow goobtaada GPS
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] text-slate-400 uppercase font-bold block">
-                      Search Radius
-                    </span>
-                    <span className="font-mono font-black text-sm text-emerald-400 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
-                      &le; {getDispatchRadiusKm()} KM
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-slate-800/90 p-2.5 rounded-xl border border-slate-700/80">
-                    <span className="text-[10px] text-slate-400 block font-semibold">Adeegga (Service Mode)</span>
-                    <span className="font-black text-amber-300 text-xs flex items-center gap-1 mt-0.5">
-                      <span>🚖 Normal & 👥 Wadaage</span>
-                    </span>
-                  </div>
-                  <div className="bg-slate-800/90 p-2.5 rounded-xl border border-slate-700/80">
-                    <span className="text-[10px] text-slate-400 block font-semibold">Xadka Masafada (Strict Limit)</span>
-                    <span className="font-black text-emerald-400 text-xs flex items-center gap-1 mt-0.5">
-                      <span>🎯 {getDispatchRadiusKm()} KM GPS Area</span>
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 p-2 rounded-xl bg-blue-950/40 border border-blue-800/50 text-[10px] text-blue-200">
-                  <ShieldCheck className="w-4 h-4 text-blue-400 shrink-0" />
-                  <span>
-                    Dalabyada ka baxsan <b>{getDispatchRadiusKm()} KM</b> laguma soo diri doono. Kaliya macamiisha {getDispatchRadiusKm()} km gudahooda ayaa ku helaya.
+          {/* Online/Offline Status Swap Card (Green for Online, Red for Offline) & Standing Road Option */}
+          {!incomingDriverRequest && (!currentRide || currentRide.status === 'searching' || currentRide.status === 'idle') && (
+            <div className={`p-4 rounded-3xl border shadow-xl space-y-3 animate-fadeIn ${
+              driverModeOnline
+                ? 'bg-gradient-to-br from-slate-900 via-emerald-950/40 to-slate-900 border-emerald-500/60 text-white'
+                : 'bg-gradient-to-br from-slate-900 via-rose-950/40 to-slate-900 border-rose-500/60 text-white'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2.5">
+                  <span className="relative flex h-4 w-4">
+                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${driverModeOnline ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
+                    <span className={`relative inline-flex rounded-full h-4 w-4 ${driverModeOnline ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
                   </span>
+                  <div>
+                    <h4 className="font-extrabold text-sm text-white flex items-center gap-2">
+                      <span>{driverModeOnline ? 'ONLINE (Waa Shaqaynayaa)' : 'OFFLINE (Waa Toosnaayoo Ma Jiro)'}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full border font-mono font-black uppercase ${
+                        driverModeOnline ? 'bg-emerald-900/90 text-emerald-300 border-emerald-600' : 'bg-rose-900/90 text-rose-300 border-rose-600'
+                      }`}>
+                        {driverModeOnline ? '🟢 GREEN' : '🔴 RED'}
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-slate-300">
+                      {driverModeOnline ? 'Radar-ka haysashada dalabyada wuu shaqaynayaa' : 'Taabo si aad u shido radar-ka oo u noqoto online'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Instant Online/Offline Swap Button */}
+                <button
+                  type="button"
+                  onClick={() => toggleDriverOnline(!driverModeOnline)}
+                  className={`px-4 py-2 rounded-2xl font-black text-xs uppercase tracking-wider shadow-lg transition active:scale-95 cursor-pointer ${
+                    driverModeOnline
+                      ? 'bg-rose-600 hover:bg-rose-700 text-white border border-rose-400'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-400'
+                  }`}
+                >
+                  {driverModeOnline ? '🔴 Go Offline' : '🟢 Go Online'}
+                </button>
+              </div>
+
+              {/* Standing Road / Street Hail & Service Mode Bar */}
+              <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                <div className="bg-slate-800/90 p-3 rounded-2xl border border-slate-700/80 flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block font-semibold">Standing Road / Street Hail</span>
+                    <span className="font-black text-white text-xs block mt-0.5">Wadaadka Wadada</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowStreetHailModal(true)}
+                    className="mt-2 w-full py-1.5 px-3 bg-[#008751] hover:bg-[#007445] text-white rounded-xl font-extrabold text-xs flex items-center justify-center space-x-1 shadow transition cursor-pointer"
+                  >
+                    <Car className="w-3.5 h-3.5 text-amber-300" />
+                    <span>+ Standing Road</span>
+                  </button>
+                </div>
+
+                <div className="bg-slate-800/90 p-3 rounded-2xl border border-slate-700/80 flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block font-semibold">Adeegga (Service Mode)</span>
+                    <span className="font-black text-amber-300 text-xs block mt-0.5">🚖 Normal & 👥 Wadaage</span>
+                  </div>
+                  <div className="mt-2 text-[10px] text-emerald-400 font-mono font-bold flex items-center gap-1">
+                    <span>🎯 &le; {getDispatchRadiusKm()} KM Area</span>
+                  </div>
                 </div>
               </div>
+            </div>
           )}
 
           {/* On-Route Second Rider (Passenger B) Dispatch Overlay ONLY if Driver is in a Wadaage Share trip with 1 rider */}
