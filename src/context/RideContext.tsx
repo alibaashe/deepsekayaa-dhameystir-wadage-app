@@ -2141,24 +2141,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const candidateAliases = getDriverAllAliases(identifier, drivers, currentUser, driverApplications);
     const cleanInput = identifier.replace(/\D/g, '');
 
-    // 1. Check latest completed transaction in driverWalletTransactions
-    let latestTxBal: number | undefined = undefined;
-    if (driverWalletTransactions && driverWalletTransactions.length > 0) {
-      const latestTx = driverWalletTransactions.find((tx) => {
-        if (!tx || (tx.status !== 'completed' && tx.status !== 'verified')) return false;
-        const txPhoneClean = tx.driverPhone ? tx.driverPhone.replace(/\D/g, '') : '';
-        const matchesId = candidateAliases.has(tx.driverId) || tx.driverId === identifier;
-        const matchesPhone = candidateAliases.has(tx.driverPhone) ||
-          (cleanInput && txPhoneClean && (cleanInput === txPhoneClean || cleanInput.endsWith(txPhoneClean) || txPhoneClean.endsWith(cleanInput)));
-        return matchesId || matchesPhone;
-      });
-
-      if (latestTx && latestTx.newBalanceUsd !== undefined && !isNaN(Number(latestTx.newBalanceUsd))) {
-        latestTxBal = Math.max(0, Math.round(Number(latestTx.newBalanceUsd) * 100) / 100);
-      }
-    }
-
-    // 2. Check all candidate keys in driverWallets map
+    // 1. Check all candidate keys in driverWallets map first (most recent real-time state update)
     const foundMapValues: number[] = [];
     for (const key of candidateAliases) {
       if (driverWallets[key] !== undefined) {
@@ -2168,8 +2151,11 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
     }
+    if (foundMapValues.length > 0) {
+      return Math.max(0, Math.round(foundMapValues[0] * 100) / 100);
+    }
 
-    // 3. Check matched driver in drivers array
+    // 2. Check matched driver in drivers array
     const matchedDrv = drivers.find((d) => d && (candidateAliases.has(d.id) || (d.phone && candidateAliases.has(d.phone))));
     const drvBalUsd = matchedDrv?.walletBalanceUsd !== undefined
       ? Number(matchedDrv.walletBalanceUsd)
@@ -2177,7 +2163,11 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ? Number((matchedDrv as any).wallet_balance_usd)
       : undefined;
 
-    // 4. Check currentUser if matching
+    if (drvBalUsd !== undefined && !isNaN(drvBalUsd)) {
+      return Math.max(0, Math.round(drvBalUsd * 100) / 100);
+    }
+
+    // 3. Check currentUser if matching
     const isCurrent = currentUser && (currentUser.role === 'driver' || currentUser.role === 'admin') && (
       candidateAliases.has(currentUser.id) ||
       (currentUser.phone && candidateAliases.has(currentUser.phone)) ||
@@ -2187,12 +2177,30 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ? Number(currentUser.walletBalanceUsd)
       : undefined;
 
-    if (latestTxBal !== undefined) {
-      return latestTxBal;
+    if (userBalUsd !== undefined && !isNaN(userBalUsd)) {
+      return Math.max(0, Math.round(userBalUsd * 100) / 100);
     }
 
-    if (foundMapValues.length > 0) {
-      return Math.max(0, Math.round(foundMapValues[0] * 100) / 100);
+    // 4. Fall back to sorted driverWalletTransactions (latest transaction running balance)
+    if (driverWalletTransactions && driverWalletTransactions.length > 0) {
+      const sortedTxs = [...driverWalletTransactions].sort((a, b) => {
+        const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+        const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+        return timeB - timeA;
+      });
+
+      const latestTx = sortedTxs.find((tx) => {
+        if (!tx || (tx.status !== 'completed' && tx.status !== 'verified')) return false;
+        const txPhoneClean = tx.driverPhone ? tx.driverPhone.replace(/\D/g, '') : '';
+        const matchesId = candidateAliases.has(tx.driverId) || tx.driverId === identifier;
+        const matchesPhone = candidateAliases.has(tx.driverPhone) ||
+          (cleanInput && txPhoneClean && (cleanInput === txPhoneClean || cleanInput.endsWith(txPhoneClean) || txPhoneClean.endsWith(cleanInput)));
+        return matchesId || matchesPhone;
+      });
+
+      if (latestTx && latestTx.newBalanceUsd !== undefined && !isNaN(Number(latestTx.newBalanceUsd))) {
+        return Math.max(0, Math.round(Number(latestTx.newBalanceUsd) * 100) / 100);
+      }
     }
 
     if (drvBalUsd !== undefined && !isNaN(drvBalUsd)) {

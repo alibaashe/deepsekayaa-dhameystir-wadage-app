@@ -1047,7 +1047,7 @@ Return ONLY valid JSON matching this schema:
 
           const idMatch = Boolean(targetDriverId && (dId === targetDriverId || dId === `drv_${targetDriverId}` || targetDriverId === `drv_${dId}`));
           const exactPhoneMatch = Boolean(targetDriverPhone && dPhone === targetDriverPhone);
-          const cleanPhoneMatch = Boolean(cleanPhone && cleanPhone.length >= 6 && cleanDPhone && (cleanPhone === cleanDPhone || cleanPhone.endsWith(cleanPhone) || cleanDPhone.endsWith(cleanPhone)));
+          const cleanPhoneMatch = Boolean(cleanPhone && cleanPhone.length >= 6 && cleanDPhone && (cleanPhone === cleanDPhone || cleanPhone.endsWith(cleanDPhone) || cleanDPhone.endsWith(cleanPhone)));
           const isGenericName = !targetDriverName || ['driver partner', 'captain', 'driver', 'wadaage captain'].includes(String(targetDriverName).toLowerCase().trim());
           const nameMatch = !isGenericName && Boolean(d.name && String(d.name).toLowerCase().trim() === String(targetDriverName).toLowerCase().trim());
 
