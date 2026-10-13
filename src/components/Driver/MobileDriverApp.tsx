@@ -240,9 +240,18 @@ export const MobileDriverApp: React.FC = () => {
         channel = new BroadcastChannel('wadaage_ride_realtime_events');
         channel.onmessage = (event) => {
           if (event.data?.type === 'DRIVER_WALLET_UPDATED') {
-            const { amountSos, amountUsd, newBalanceUsd, tx } = event.data?.payload || {};
+            const payloadData = event.data?.payload || event.data || {};
+            const { driverId, driverPhone, amountSos, amountUsd, newBalanceUsd, tx } = payloadData;
+
+            const isMe = currentUser && (
+              (driverId && currentUser.id === driverId) ||
+              (driverPhone && currentUser.phone === driverPhone) ||
+              (tx?.driverId && currentUser.id === tx.driverId) ||
+              (tx?.driverPhone && currentUser.phone === tx.driverPhone)
+            );
+
             const curStatus = String(tx?.status || '').toLowerCase();
-            if (curStatus === 'completed' || curStatus === 'verified' || !tx) {
+            if ((isMe || !driverId) && (curStatus === 'completed' || curStatus === 'verified' || !tx)) {
               const sos = amountSos || Math.round((amountUsd || 0) * 10000);
               const usd = amountUsd || (sos / 10000);
               if (sos > 0 || usd > 0) {

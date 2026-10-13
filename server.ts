@@ -1000,7 +1000,6 @@ Return ONLY valid JSON matching this schema:
       created_at: req.body.created_at || new Date().toISOString(),
       timestamp: req.body.timestamp || Date.now(),
       ...req.body,
-      status: status,
     };
 
     // Single Execution & Row Locking Check
@@ -1050,8 +1049,8 @@ Return ONLY valid JSON matching this schema:
       let finalBalanceUsd = 0;
 
       if (driver) {
-        if (req.body.newBalanceUsd !== undefined && Number(req.body.newBalanceUsd) > 0) {
-          finalBalanceUsd = Number(req.body.newBalanceUsd);
+        if (req.body.newBalanceUsd !== undefined && !isNaN(Number(req.body.newBalanceUsd))) {
+          finalBalanceUsd = Math.max(0, Math.round(Number(req.body.newBalanceUsd) * 100) / 100);
         } else if (!wasAlreadyCompleted) {
           const curBal = Number(driver.wallet_balance_usd ?? driver.walletBalanceUsd ?? 0);
           finalBalanceUsd = Math.max(0, Math.round((curBal + deltaUsd) * 100) / 100);
@@ -1068,8 +1067,8 @@ Return ONLY valid JSON matching this schema:
         dbService.syncDriverToMySQL(driver).catch(() => {});
       } else if (targetDriverId || targetDriverPhone) {
         // Driver not in database yet - create registered driver record with top-up balance
-        finalBalanceUsd = req.body.newBalanceUsd !== undefined && Number(req.body.newBalanceUsd) > 0
-          ? Number(req.body.newBalanceUsd)
+        finalBalanceUsd = req.body.newBalanceUsd !== undefined && !isNaN(Number(req.body.newBalanceUsd))
+          ? Math.max(0, Math.round(Number(req.body.newBalanceUsd) * 100) / 100)
           : Math.max(0, deltaUsd);
 
         const newDrv = {
@@ -1119,7 +1118,7 @@ Return ONLY valid JSON matching this schema:
 
     // Real-Time SSE Broadcast to all connected Admin and Driver clients
     if (currentStatus === 'pending_verification') {
-      const pendingPayload = `data: ${JSON.stringify({
+      const pendingData = {
         type: 'DRIVER_TOPUP_REQUESTED',
         driverId: tx.driverId || req.body.driverId || '',
         driverPhone: tx.driverPhone || req.body.driverPhone || '',
@@ -1128,7 +1127,8 @@ Return ONLY valid JSON matching this schema:
         amountSos: Number(tx.amountSos ?? (Number(tx.amountUsd ?? tx.amount_usd ?? 0) * 10000)),
         tx,
         timestamp: Date.now(),
-      })}\n\n`;
+      };
+      const pendingPayload = `data: ${JSON.stringify({ ...pendingData, payload: pendingData })}\n\n`;
 
       for (const client of sseClients) {
         try {
@@ -1139,16 +1139,17 @@ Return ONLY valid JSON matching this schema:
       }
     }
 
-    const ssePayload = `data: ${JSON.stringify({
+    const driverWalletData = {
       type: 'DRIVER_WALLET_UPDATED',
       driverId: tx.driverId || updatedDriver?.id,
       driverPhone: tx.driverPhone || updatedDriver?.phone,
       amountUsd: Number(tx.amountUsd ?? tx.amount_usd ?? 0),
       amountSos: Number(tx.amountSos ?? (Number(tx.amountUsd ?? tx.amount_usd ?? 0) * 10000)),
-      newBalanceUsd: updatedDriver ? updatedDriver.wallet_balance_usd : undefined,
+      newBalanceUsd: updatedDriver ? updatedDriver.wallet_balance_usd : (tx.newBalanceUsd !== undefined ? Number(tx.newBalanceUsd) : undefined),
       tx,
       timestamp: Date.now(),
-    })}\n\n`;
+    };
+    const ssePayload = `data: ${JSON.stringify({ ...driverWalletData, payload: driverWalletData })}\n\n`;
 
     for (const client of sseClients) {
       try {
@@ -1162,14 +1163,15 @@ Return ONLY valid JSON matching this schema:
     if (tx.user_id || tx.userId) {
       const uId = tx.user_id || tx.userId;
       const targetUser = dbService.store.users.find((u: any) => u.id === uId || u.phone === uId);
-      const userPayload = `data: ${JSON.stringify({
+      const userWalletData = {
         type: 'USER_WALLET_UPDATED',
         userId: uId,
         amountUsd: Number(tx.amountUsd ?? tx.amount_usd ?? 0),
         newBalanceUsd: targetUser ? targetUser.wallet_balance_usd : undefined,
         tx,
         timestamp: Date.now(),
-      })}\n\n`;
+      };
+      const userPayload = `data: ${JSON.stringify({ ...userWalletData, payload: userWalletData })}\n\n`;
 
       for (const client of sseClients) {
         try {
@@ -2240,7 +2242,7 @@ Return ONLY valid JSON matching this schema:
     // Broadcast update to all connected clients
     broadcastRidesToClients('RIDE_STATUS_UPDATED');
 
-    const ssePayload = `data: ${JSON.stringify({
+    const finishWalletData = {
       type: 'DRIVER_WALLET_UPDATED',
       driverId: targetDriverId,
       driverPhone: driverInDb?.phone || targetDriverPhone,
@@ -2249,7 +2251,8 @@ Return ONLY valid JSON matching this schema:
       newBalanceUsd: calculatedNewBal,
       tx: commTx,
       timestamp: Date.now(),
-    })}\n\n`;
+    };
+    const ssePayload = `data: ${JSON.stringify({ ...finishWalletData, payload: finishWalletData })}\n\n`;
 
     for (const client of sseClients) {
       try { client.write(ssePayload); } catch (_e) { sseClients.delete(client); }
