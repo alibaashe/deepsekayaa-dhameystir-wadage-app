@@ -2341,21 +2341,25 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
               };
             });
 
-            // Synchronize driverWallets with verified database balances (Server database is truth)
+            // Synchronize driverWallets with verified database balances (Preserving highest balance via Math.max)
             setDriverWallets((prev) => {
               const updated = { ...prev };
               let changed = false;
               dbDrivers.forEach((d) => {
                 const serverBal = Number(d.walletBalanceUsd ?? 0);
                 if (d.id) {
-                  if (updated[d.id] !== serverBal) {
-                    updated[d.id] = serverBal;
+                  const existingMapBal = updated[d.id] ?? 0;
+                  const safeBal = Math.max(existingMapBal, serverBal);
+                  if (updated[d.id] !== safeBal) {
+                    updated[d.id] = safeBal;
                     changed = true;
                   }
                 }
                 if (d.phone) {
-                  if (updated[d.phone] !== serverBal) {
-                    updated[d.phone] = serverBal;
+                  const existingMapBal = updated[d.phone] ?? 0;
+                  const safeBal = Math.max(existingMapBal, serverBal);
+                  if (updated[d.phone] !== safeBal) {
+                    updated[d.phone] = safeBal;
                     changed = true;
                   }
                 }
@@ -2400,7 +2404,10 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
               const cur = merged[idx];
               const latDiff = Math.abs((cur.currentLocation?.lat || 0) - (rd.currentLocation?.lat || 0));
               const lngDiff = Math.abs((cur.currentLocation?.lng || 0) - (rd.currentLocation?.lng || 0));
-              const safeBal = rd.walletBalanceUsd !== undefined ? Number(rd.walletBalanceUsd) : cur.walletBalanceUsd;
+              const remoteBal = rd.walletBalanceUsd !== undefined ? Number(rd.walletBalanceUsd) : (rd as any).wallet_balance_usd !== undefined ? Number((rd as any).wallet_balance_usd) : undefined;
+              const localBal = cur.walletBalanceUsd || 0;
+              const mapBal = driverWallets[rd.id] || (rd.phone ? driverWallets[rd.phone] : 0) || 0;
+              const safeBal = Math.max(localBal, mapBal, remoteBal !== undefined && !isNaN(remoteBal) ? remoteBal : 0);
               if (
                 cur.status !== rd.status ||
                 cur.name !== rd.name ||
@@ -2409,7 +2416,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 latDiff > 0.00001 ||
                 lngDiff > 0.00001
               ) {
-                merged[idx] = { ...cur, ...rd, walletBalanceUsd: safeBal };
+                merged[idx] = { ...cur, ...rd, walletBalanceUsd: safeBal, wallet_balance_usd: safeBal };
                 hasChanged = true;
               }
             } else {
@@ -6436,6 +6443,10 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateDriverApplicationStatus = (appId: string, status: DriverApplicationStatus, adminNote?: string) => {
+    const targetApp = driverApplications.find(a => a.id === appId);
+    if (targetApp && targetApp.status === 'approved' && status === 'approved') {
+      return;
+    }
     let updatedAppObj: DriverApplication | null = null;
     let newlyCreatedDriver: Driver | null = null;
 

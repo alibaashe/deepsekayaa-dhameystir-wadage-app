@@ -359,9 +359,9 @@ export const FiveManagersControlPanel: React.FC<FiveManagersControlPanelProps> =
                         Manual Override Driver Assignment:
                       </label>
                       <div className="grid grid-cols-2 gap-1.5">
-                        {drivers.slice(0, 4).map((drv) => (
+                        {drivers.slice(0, 4).map((drv, idx) => (
                           <button
-                            key={drv.id}
+                            key={`${drv.id || 'drv'}_${idx}`}
                             onClick={() => dispatchDriverToRide(currentRide.id, drv.id)}
                             className="px-2 py-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-[10px] rounded-lg transition"
                           >
@@ -472,9 +472,9 @@ export const FiveManagersControlPanel: React.FC<FiveManagersControlPanelProps> =
                     <p className="text-[10px]">Drivers will appear here when they register from the mobile app.</p>
                   </div>
                 ) : (
-                  drivers.map((drv) => (
+                  drivers.map((drv, idx) => (
                     <div
-                      key={drv.id}
+                      key={`${drv.id || 'drv'}_${idx}`}
                       className="flex items-center justify-between p-2.5 bg-slate-900 rounded-xl border border-slate-800 text-xs"
                     >
                       <div className="flex items-center space-x-2.5">
