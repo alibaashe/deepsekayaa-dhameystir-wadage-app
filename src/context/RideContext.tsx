@@ -2277,8 +2277,28 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    // Initial fetch from backend Hostinger database drivers
+    // Initial fetch from backend Hostinger database drivers & wallet transactions
     try {
+      fetch(getApiUrl('/api/db/wallet-transactions'))
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.success && Array.isArray(data.data) && data.data.length > 0) {
+            setDriverWalletTransactions((prev) => {
+              const map = new Map<string, any>();
+              data.data.forEach((tx: any) => map.set(tx.id, tx));
+              prev.forEach((tx) => {
+                if (!map.has(tx.id)) map.set(tx.id, tx);
+              });
+              const merged = Array.from(map.values());
+              try {
+                localStorage.setItem('wadaage_driver_wallet_transactions', JSON.stringify(merged));
+              } catch (_e) {}
+              return merged;
+            });
+          }
+        })
+        .catch(() => {});
+
       fetch(getApiUrl('/api/db/drivers'))
         .then((res) => res.json())
         .then((data) => {
@@ -2321,26 +2341,30 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
               };
             });
 
-            // Synchronize driverWallets with verified database balances
+            // Synchronize driverWallets with verified database balances (Server database is truth)
             setDriverWallets((prev) => {
               const updated = { ...prev };
               let changed = false;
               dbDrivers.forEach((d) => {
-                if (d.id && d.walletBalanceUsd !== undefined) {
-                  if (updated[d.id] === undefined) {
-                    updated[d.id] = d.walletBalanceUsd;
+                const serverBal = Number(d.walletBalanceUsd ?? 0);
+                if (d.id) {
+                  if (updated[d.id] !== serverBal) {
+                    updated[d.id] = serverBal;
                     changed = true;
                   }
                 }
-                if (d.phone && d.walletBalanceUsd !== undefined) {
-                  if (updated[d.phone] === undefined) {
-                    updated[d.phone] = d.walletBalanceUsd;
+                if (d.phone) {
+                  if (updated[d.phone] !== serverBal) {
+                    updated[d.phone] = serverBal;
                     changed = true;
                   }
                 }
               });
               if (changed) {
-                try { localStorage.setItem('wadaage_driver_wallets_map', JSON.stringify(updated)); } catch (_e) {}
+                try {
+                  localStorage.setItem('wadaage_driver_wallets_map', JSON.stringify(updated));
+                  localStorage.setItem('wadaage_v2_wallets', JSON.stringify(updated));
+                } catch (_e) {}
               }
               return changed ? updated : prev;
             });
