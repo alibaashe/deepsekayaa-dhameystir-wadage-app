@@ -2187,15 +2187,20 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ? Number(currentUser.walletBalanceUsd)
       : undefined;
 
-    const valuesToCompare = [
-      latestTxBal,
-      ...foundMapValues,
-      drvBalUsd,
-      userBalUsd,
-    ].filter((v): v is number => v !== undefined && !isNaN(v));
+    if (latestTxBal !== undefined) {
+      return latestTxBal;
+    }
 
-    if (valuesToCompare.length > 0) {
-      return Math.max(0, Math.round(Math.max(...valuesToCompare) * 100) / 100);
+    if (foundMapValues.length > 0) {
+      return Math.max(0, Math.round(foundMapValues[0] * 100) / 100);
+    }
+
+    if (drvBalUsd !== undefined && !isNaN(drvBalUsd)) {
+      return Math.max(0, Math.round(drvBalUsd * 100) / 100);
+    }
+
+    if (userBalUsd !== undefined && !isNaN(userBalUsd)) {
+      return Math.max(0, Math.round(userBalUsd * 100) / 100);
     }
 
     return 0.00;
@@ -2313,8 +2318,6 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (data && data.success && Array.isArray(data.data) && data.data.length > 0) {
             const dbDrivers: Driver[] = data.data.map((dbD: any) => {
               const serverBalUsd = Number(dbD.walletBalanceUsd ?? dbD.wallet_balance_usd ?? 0);
-              const localBalUsd = getDriverWalletBalance(dbD.id) || (dbD.phone ? getDriverWalletBalance(dbD.phone) : 0) || 0;
-              const realBalUsd = Math.max(localBalUsd, serverBalUsd);
               return {
                 id: dbD.id,
                 name: dbD.name,
@@ -2347,30 +2350,24 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 weeklyEarnings: Number(dbD.weekly_earnings || 0),
                 hoursOnline: Number(dbD.hours_online || 0),
                 acceptanceRate: Number(dbD.acceptance_rate || 100),
-                walletBalanceUsd: realBalUsd,
-                wallet_balance_usd: realBalUsd,
+                walletBalanceUsd: serverBalUsd,
+                wallet_balance_usd: serverBalUsd,
               };
             });
 
-            // Synchronize driverWallets with verified database balances (Preserve whichever balance is higher/newer)
+            // Synchronize driverWallets with verified database balances
             setDriverWallets((prev) => {
               const updated = { ...prev };
               let changed = false;
               dbDrivers.forEach((d) => {
-                const effectiveBal = Number(d.walletBalanceUsd ?? 0);
-                if (d.id) {
-                  const cur = updated[d.id] ?? 0;
-                  if (cur < effectiveBal) {
-                    updated[d.id] = effectiveBal;
-                    changed = true;
-                  }
+                const serverBal = Number(d.walletBalanceUsd ?? 0);
+                if (d.id && updated[d.id] !== serverBal) {
+                  updated[d.id] = serverBal;
+                  changed = true;
                 }
-                if (d.phone) {
-                  const cur = updated[d.phone] ?? 0;
-                  if (cur < effectiveBal) {
-                    updated[d.phone] = effectiveBal;
-                    changed = true;
-                  }
+                if (d.phone && updated[d.phone] !== serverBal) {
+                  updated[d.phone] = serverBal;
+                  changed = true;
                 }
               });
               if (changed) {
