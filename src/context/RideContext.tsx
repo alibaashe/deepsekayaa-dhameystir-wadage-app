@@ -3623,10 +3623,15 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return updatedDrivers;
     });
 
-    // Explicitly sync updated driver to Firestore and Hostinger DB
+    // Explicitly sync updated driver to Firestore, Hostinger DB, and Server memory store
     if (targetDriverObjForSync) {
       saveDriverToFirestore(targetDriverObjForSync);
       syncDriverToHostinger(targetDriverObjForSync);
+      fetch(getApiUrl('/api/db/drivers'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(targetDriverObjForSync),
+      }).catch(() => {});
     }
 
     // 3. Mutate currentUser if matching and persist to secureStorage & localStorage

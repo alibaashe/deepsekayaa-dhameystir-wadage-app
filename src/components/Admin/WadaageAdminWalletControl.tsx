@@ -158,11 +158,12 @@ export const WadaageAdminWalletControl: React.FC = React.memo(() => {
 
   // Open Driver Wallet Adjustment Modal
   const handleOpenDriverModal = (drv: Driver, initialOp: 'add' | 'deduct' | 'set' = 'add') => {
+    if (!drv) return;
     setSelectedDriverForEdit(drv);
     setEditOperation(initialOp);
     setActionToast(null);
 
-    const curBal = getDriverWalletBalance(drv.id) || (drv.phone ? getDriverWalletBalance(drv.phone) : 0) || 0;
+    const curBal = drv.id ? (getDriverWalletBalance(drv.id) || (drv.phone ? getDriverWalletBalance(drv.phone) : 0) || 0) : 0;
 
     if (initialOp === 'set') {
       setInputSlsh('0');
@@ -355,11 +356,12 @@ export const WadaageAdminWalletControl: React.FC = React.memo(() => {
 
   // Selected Driver Specific Transactions for History Modal
   const selectedDriverTransactions = useMemo(() => {
-    if (!selectedDriverForHistory) return [];
+    if (!selectedDriverForHistory || !selectedDriverForHistory.id) return [];
     const dId = selectedDriverForHistory.id;
     const dPhone = selectedDriverForHistory.phone ? selectedDriverForHistory.phone.replace(/\D/g, '') : '';
 
-    return driverWalletTransactions.filter((tx) => {
+    return (driverWalletTransactions || []).filter((tx) => {
+      if (!tx) return false;
       const txPhone = tx.driverPhone ? tx.driverPhone.replace(/\D/g, '') : '';
       return (
         tx.driverId === dId ||
@@ -370,7 +372,7 @@ export const WadaageAdminWalletControl: React.FC = React.memo(() => {
 
   // Live Math preview for modal
   const previewMath = useMemo(() => {
-    if (!selectedDriverForEdit) return null;
+    if (!selectedDriverForEdit || !selectedDriverForEdit.id) return null;
     const curBal =
       getDriverWalletBalance(selectedDriverForEdit.id) ||
       (selectedDriverForEdit.phone ? getDriverWalletBalance(selectedDriverForEdit.phone) : 0) ||
@@ -614,6 +616,7 @@ export const WadaageAdminWalletControl: React.FC = React.memo(() => {
                   </tr>
                 ) : (
                   filteredDrivers.map((drv) => {
+                    if (!drv || !drv.id) return null;
                     const balUsd = getDriverWalletBalance(drv.id) || (drv.phone ? getDriverWalletBalance(drv.phone) : 0);
                     const balSos = Math.round(balUsd * EXCHANGE_RATE_USD_TO_SLSH);
                     const isEligible = balUsd >= (pricing?.driverMinWalletThresholdUsd || 0.10);
@@ -791,6 +794,7 @@ export const WadaageAdminWalletControl: React.FC = React.memo(() => {
           ) : (
             <div className="grid grid-cols-1 gap-3.5">
               {pendingTxs.map((tx) => {
+                if (!tx || !tx.id) return null;
                 const currentEditedSos = editedAmounts[tx.id] !== undefined ? editedAmounts[tx.id] : tx.amountSos;
                 const isAmountChanged = currentEditedSos !== (tx.originalRequestedAmountSos || tx.amountSos);
                 const editedUsd = (currentEditedSos / 10000).toFixed(2);
@@ -1102,6 +1106,7 @@ export const WadaageAdminWalletControl: React.FC = React.memo(() => {
                   </tr>
                 ) : (
                   filteredTxs.map((tx) => {
+                    if (!tx || !tx.id) return null;
                     const isPending = tx.status === 'pending_verification';
                     const isCompleted = tx.status === 'completed';
                     const isRejected = tx.status === 'rejected';
@@ -1531,10 +1536,10 @@ export const WadaageAdminWalletControl: React.FC = React.memo(() => {
                 <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700">
                   <span className="text-[10px] text-slate-400 uppercase font-bold block">Current Balance</span>
                   <span className="text-lg font-black font-mono text-emerald-600 dark:text-emerald-400 block">
-                    ${(getDriverWalletBalance(selectedDriverForHistory.id) || 0).toFixed(2)}
+                    ${(selectedDriverForHistory?.id ? getDriverWalletBalance(selectedDriverForHistory.id) : 0).toFixed(2)}
                   </span>
                   <span className="text-[10px] text-slate-500 font-mono">
-                    {Math.round((getDriverWalletBalance(selectedDriverForHistory.id) || 0) * 10000).toLocaleString()} SLSH
+                    {Math.round((selectedDriverForHistory?.id ? getDriverWalletBalance(selectedDriverForHistory.id) : 0) * 10000).toLocaleString()} SLSH
                   </span>
                 </div>
 
@@ -1590,6 +1595,7 @@ export const WadaageAdminWalletControl: React.FC = React.memo(() => {
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
                         {selectedDriverTransactions.map((tx) => {
+                          if (!tx || !tx.id) return null;
                           const isDeduct = tx.type === 'commission_deduction' || tx.amountSos < 0 || tx.title?.includes('Deducted');
 
                           return (

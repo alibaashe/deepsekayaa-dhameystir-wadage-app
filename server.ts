@@ -789,6 +789,8 @@ Return ONLY valid JSON matching this schema:
       dbService.store.drivers.unshift(newDriver);
     }
 
+    dbService.saveToDisk();
+
     // Direct Asynchronous Sync to Live Hostinger MySQL database
     dbService.syncDriverToMySQL(newDriver).catch(() => {});
 
@@ -1109,12 +1111,16 @@ Return ONLY valid JSON matching this schema:
       if (user && tx.status === 'completed') {
         const curBal = Number(user.wallet_balance_usd || 0);
         const delta = Number(tx.amountUsd ?? tx.amount_usd ?? tx.amount ?? 0);
-        const newBal = Math.max(0, Math.round((curBal + delta) * 100) / 100);
+        const newBal = req.body.newBalanceUsd !== undefined && !isNaN(Number(req.body.newBalanceUsd))
+          ? Math.max(0, Math.round(Number(req.body.newBalanceUsd) * 100) / 100)
+          : Math.max(0, Math.round((curBal + delta) * 100) / 100);
         user.wallet_balance_usd = newBal;
         user.wallet_balance_sos = Math.round(newBal * 10000);
         dbService.syncUserToMySQL(user).catch(() => {});
       }
     }
+
+    dbService.saveToDisk();
 
     // Real-Time SSE Broadcast to all connected Admin and Driver clients
     if (currentStatus === 'pending_verification') {
