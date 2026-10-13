@@ -235,11 +235,13 @@ export const WadaageAdminWalletControl: React.FC = React.memo(() => {
       const realAmountSos = editedAmounts[tx.id] !== undefined ? editedAmounts[tx.id] : tx.amountSos;
       const note = adminNotes[tx.id] || `Verified by Admin. Amount credited: ${realAmountSos.toLocaleString()} SLSH ($${(realAmountSos / 10000).toFixed(2)} USD).`;
       verifyAndApproveDriverTopUp(tx.id, realAmountSos, note);
+      const targetId = tx.driverId || tx.driverPhone || '';
+      const newBal = getDriverWalletBalance(targetId) || (tx.driverPhone ? getDriverWalletBalance(tx.driverPhone) : 0);
       setActionToast({
-        text: `Top-up for ${tx.driverName || 'driver'} approved and credited successfully!`,
+        text: `Top-up for ${tx.driverName || 'driver'} approved! Credited +${realAmountSos.toLocaleString()} SLSH. New Balance: $${newBal.toFixed(2)} USD (${Math.round(newBal * 10000).toLocaleString()} SLSH).`,
         type: 'success',
       });
-      setTimeout(() => setActionToast(null), 3500);
+      setTimeout(() => setActionToast(null), 4000);
     } catch (e) {
       console.error('Error verifying top-up:', e);
       setActionToast({ text: 'Failed to verify top-up.', type: 'error' });
@@ -276,8 +278,9 @@ export const WadaageAdminWalletControl: React.FC = React.memo(() => {
     if (targetType === 'driver') {
       if (directAmountSos <= 0) return;
       adminDirectCreditDriverWallet(targetDriverId, directAmountSos, directNote);
+      const newBal = getDriverWalletBalance(targetDriverId) || 0;
       setActionToast({
-        text: `Successfully credited ${directAmountSos.toLocaleString()} SLSH to driver wallet!`,
+        text: `Successfully credited ${directAmountSos.toLocaleString()} SLSH to driver wallet! New Balance: $${newBal.toFixed(2)} USD (${Math.round(newBal * 10000).toLocaleString()} SLSH).`,
         type: 'success',
       });
     } else {

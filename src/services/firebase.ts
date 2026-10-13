@@ -752,17 +752,23 @@ export function subscribeToTransactions(onUpdate: (txs: DriverWalletTransaction[
     console.warn('Firestore transactions listener fallback:', err);
   }
 
-  fetch(getApiUrl('/api/db/wallet-transactions'))
-    .then((res) => (res.ok ? res.json() : null))
-    .then((data) => {
-      if (data && Array.isArray(data.data) && data.data.length > 0) {
-        onUpdate(data.data as DriverWalletTransaction[]);
-      }
-    })
-    .catch(() => {});
+  const pollTxs = () => {
+    fetch(getApiUrl('/api/db/wallet-transactions'))
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && Array.isArray(data.data) && data.data.length > 0) {
+          onUpdate(data.data as DriverWalletTransaction[]);
+        }
+      })
+      .catch(() => {});
+  };
+
+  pollTxs();
+  const txPollInterval = setInterval(pollTxs, 4000);
 
   return () => {
     if (unsubscribeFirestore) unsubscribeFirestore();
+    clearInterval(txPollInterval);
   };
 }
 

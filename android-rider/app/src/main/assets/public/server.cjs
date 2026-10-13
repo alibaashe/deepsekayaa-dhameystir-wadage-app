@@ -1803,6 +1803,27 @@ User language: ${language}`,
         });
       }
     }
+    if (currentStatus === "pending_verification") {
+      const pendingPayload = `data: ${JSON.stringify({
+        type: "DRIVER_TOPUP_REQUESTED",
+        driverId: tx.driverId || req.body.driverId || "",
+        driverPhone: tx.driverPhone || req.body.driverPhone || "",
+        driverName: tx.driverName || req.body.driverName || "Driver Partner",
+        amountUsd: Number(tx.amountUsd ?? tx.amount_usd ?? 0),
+        amountSos: Number(tx.amountSos ?? Number(tx.amountUsd ?? tx.amount_usd ?? 0) * 1e4),
+        tx,
+        timestamp: Date.now()
+      })}
+
+`;
+      for (const client of sseClients) {
+        try {
+          client.write(pendingPayload);
+        } catch (_e) {
+          sseClients.delete(client);
+        }
+      }
+    }
     const ssePayload = `data: ${JSON.stringify({
       type: "DRIVER_WALLET_UPDATED",
       driverId: tx.driverId || updatedDriver?.id,

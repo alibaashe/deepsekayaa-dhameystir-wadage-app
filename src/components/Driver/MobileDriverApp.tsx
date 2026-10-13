@@ -26,6 +26,7 @@ import {
   X,
   Check,
   CheckCircle,
+  CheckCircle2,
   AlertTriangle,
   History,
   TrendingUp,
@@ -222,6 +223,47 @@ export const MobileDriverApp: React.FC = () => {
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch (_e) {}
   }, [currentRide]);
+
+  // Real-Time Top-Up Approval Banner State
+  const [walletSuccessBanner, setWalletSuccessBanner] = useState<{
+    text: string;
+    amountSos: number;
+    amountUsd: number;
+    newBalanceUsd: number;
+  } | null>(null);
+
+  // Listen for instant top-up approval broadcast events
+  useEffect(() => {
+    let channel: BroadcastChannel | null = null;
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        channel = new BroadcastChannel('wadaage_ride_realtime_events');
+        channel.onmessage = (event) => {
+          if (event.data?.type === 'DRIVER_WALLET_UPDATED') {
+            const { amountSos, amountUsd, newBalanceUsd, tx } = event.data?.payload || {};
+            const curStatus = String(tx?.status || '').toLowerCase();
+            if (curStatus === 'completed' || curStatus === 'verified' || !tx) {
+              const sos = amountSos || Math.round((amountUsd || 0) * 10000);
+              const usd = amountUsd || (sos / 10000);
+              if (sos > 0 || usd > 0) {
+                setWalletSuccessBanner({
+                  text: `Top-up Approved & Credited! +${sos.toLocaleString()} SLSH ($${usd.toFixed(2)} USD)`,
+                  amountSos: sos,
+                  amountUsd: usd,
+                  newBalanceUsd: newBalanceUsd ?? driverWalletBalanceUsd,
+                });
+                setTimeout(() => setWalletSuccessBanner(null), 6000);
+              }
+            }
+          }
+        };
+      }
+    } catch (_e) {}
+
+    return () => {
+      if (channel) channel.close();
+    };
+  }, [driverWalletBalanceUsd]);
 
   // Real-Time Road Driving Telematics & Standing Meter Stepper
   const [isAutoDriving, setIsAutoDriving] = useState<boolean>(false);
@@ -624,6 +666,32 @@ export const MobileDriverApp: React.FC = () => {
                 <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white" />
               </button>
             </div>
+
+            {/* Instant Real-Time Top-Up Approval Banner */}
+            {walletSuccessBanner && (
+              <div className="pointer-events-auto bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-800 text-white p-3 rounded-2xl shadow-2xl border border-emerald-400 flex items-center justify-between animate-pulse">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center font-black shrink-0">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-200" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-black tracking-wider block text-emerald-200">
+                      ✓ Top-Up Approved & Balance Credited
+                    </span>
+                    <span className="text-xs font-bold font-mono block">
+                      +{walletSuccessBanner.amountSos.toLocaleString()} SLSH (${walletSuccessBanner.amountUsd.toFixed(2)}) • New Balance: ${walletSuccessBanner.newBalanceUsd.toFixed(2)} USD
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setWalletSuccessBanner(null)}
+                  className="p-1 text-white/80 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
 
             {/* Compact Status & Quick Stats Bar (small size, non-obtrusive for maximum map visibility) */}
             <div className="flex items-center justify-between gap-2 pointer-events-auto">

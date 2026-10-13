@@ -914,10 +914,13 @@ export const UserManagementTable: React.FC = React.memo(() => {
                         setIsSubmittingTopUp(true);
                         if (isDriver) {
                           adminCreditDriverWallet(targetUser.id, topUpAmountUsd, false, `Admin Direct Top-Up for ${targetUser.name}`);
+                          const updatedBal = getDriverWalletBalance(targetUser.id) || (targetUser.phone ? getDriverWalletBalance(targetUser.phone) : 0);
+                          setTopUpSuccessMsg(`Successfully credited $${topUpAmountUsd.toFixed(2)} to ${targetUser.name}! New Balance: $${updatedBal.toFixed(2)} USD (${Math.round(updatedBal * 10000).toLocaleString()} SOS).`);
                         } else {
                           adminCreditUserWallet(targetUser.id, topUpAmountUsd, `Admin Direct Top-Up for ${targetUser.name}`);
+                          const updatedBal = getUserWalletBalance(targetUser.id) || (targetUser.phone ? getUserWalletBalance(targetUser.phone) : 0);
+                          setTopUpSuccessMsg(`Successfully credited $${topUpAmountUsd.toFixed(2)} to ${targetUser.name}! New Balance: $${updatedBal.toFixed(2)} USD.`);
                         }
-                        setTopUpSuccessMsg(`Successfully credited $${topUpAmountUsd.toFixed(2)} to ${targetUser.name}!`);
                         setTimeout(() => {
                           setTopUpUserId(null);
                           setTopUpSuccessMsg(null);

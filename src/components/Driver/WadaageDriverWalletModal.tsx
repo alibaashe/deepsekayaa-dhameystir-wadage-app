@@ -64,10 +64,11 @@ export const WadaageDriverWalletModal: React.FC<WadaageDriverWalletModalProps> =
   const [edahabPollStatus, setEdahabPollStatus] = useState<string>('');
 
   // Dedicated reactive balance state variable tracking live driver balance
-  const activeDriverId = currentUser?.role === 'driver' ? (currentUser.id || currentUser.phone || '') : '';
-  const activeBalanceUsd = (currentUser?.role === 'driver' && activeDriverId)
-    ? getDriverWalletBalance(activeDriverId)
-    : (driverWalletBalanceUsd || 0);
+  const targetDriverRecord = drivers.find(
+    (d) => d.id === currentUser?.id || d.phone === currentUser?.phone || d.name === currentUser?.name
+  ) || drivers[0];
+  const activeDriverId = currentUser?.id || currentUser?.phone || targetDriverRecord?.id || 'drv_01';
+  const activeBalanceUsd = getDriverWalletBalance(activeDriverId) || (driverWalletBalanceUsd || 0);
 
   if (!isOpen) return null;
 
@@ -197,7 +198,8 @@ export const WadaageDriverWalletModal: React.FC<WadaageDriverWalletModalProps> =
 
     setTimeout(() => {
       try {
-        const result = topUpDriverWallet(selectedAmount, provider, phone, referenceId, smsText);
+        const targetDrvId = targetDriverRecord?.id || currentUser?.id || 'drv_01';
+        const result = topUpDriverWallet(selectedAmount, provider, phone, referenceId, smsText, targetDrvId);
         if (result.success) {
           setSuccessMsg(result.message);
           setReferenceId('');

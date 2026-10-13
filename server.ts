@@ -978,7 +978,8 @@ Return ONLY valid JSON matching this schema:
   app.post('/api/db/wallet-transactions', (req, res) => {
     const rawAmountSos = Number(req.body.amountSos ?? req.body.amountSlsh ?? req.body.amount_sos ?? 0);
     const rawAmountUsd = Number(req.body.amountUsd ?? req.body.amount_usd ?? req.body.amount ?? (rawAmountSos > 0 ? rawAmountSos / 10000 : 0));
-    const status = String(req.body.status || 'PENDING').toUpperCase();
+    const rawStatus = String(req.body.status || 'pending').toLowerCase();
+    const status = rawStatus === 'pending_verification' ? 'pending_verification' : rawStatus;
 
     const tx = {
       id: req.body.id || `dtx_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -999,6 +1000,7 @@ Return ONLY valid JSON matching this schema:
       created_at: req.body.created_at || new Date().toISOString(),
       timestamp: req.body.timestamp || Date.now(),
       ...req.body,
+      status: status,
     };
 
     // Single Execution & Row Locking Check
@@ -1116,6 +1118,27 @@ Return ONLY valid JSON matching this schema:
     }
 
     // Real-Time SSE Broadcast to all connected Admin and Driver clients
+    if (currentStatus === 'pending_verification') {
+      const pendingPayload = `data: ${JSON.stringify({
+        type: 'DRIVER_TOPUP_REQUESTED',
+        driverId: tx.driverId || req.body.driverId || '',
+        driverPhone: tx.driverPhone || req.body.driverPhone || '',
+        driverName: tx.driverName || req.body.driverName || 'Driver Partner',
+        amountUsd: Number(tx.amountUsd ?? tx.amount_usd ?? 0),
+        amountSos: Number(tx.amountSos ?? (Number(tx.amountUsd ?? tx.amount_usd ?? 0) * 10000)),
+        tx,
+        timestamp: Date.now(),
+      })}\n\n`;
+
+      for (const client of sseClients) {
+        try {
+          client.write(pendingPayload);
+        } catch (_e) {
+          sseClients.delete(client);
+        }
+      }
+    }
+
     const ssePayload = `data: ${JSON.stringify({
       type: 'DRIVER_WALLET_UPDATED',
       driverId: tx.driverId || updatedDriver?.id,

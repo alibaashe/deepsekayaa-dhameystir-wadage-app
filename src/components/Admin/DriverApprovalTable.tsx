@@ -26,7 +26,7 @@ import { deleteApplicationFromFirestore, saveDriverToFirestore } from '../../ser
 import { KeyRound, Lock } from 'lucide-react';
 
 export const DriverApprovalTable: React.FC = React.memo(() => {
-  const { driverApplications, drivers, updateDriverApplicationStatus, deleteDriverApplication, updateUserPassword, approveDriver } = useRide();
+  const { driverApplications, drivers, updateDriverApplicationStatus, deleteDriverApplication, updateUserPassword, approveDriver, getDriverWalletBalance } = useRide();
   const [activeSubTab, setActiveSubTab] = useState<'applications' | 'registered_drivers'>('registered_drivers');
   const [selectedApp, setSelectedApp] = useState<DriverApplication | null>(null);
   const [selectedDriverRecord, setSelectedDriverRecord] = useState<Driver | null>(null);
@@ -200,7 +200,8 @@ export const DriverApprovalTable: React.FC = React.memo(() => {
                 const model = driver.vehicle?.model || (driver as any).model || 'Toyota Vitz';
                 const color = driver.vehicle?.color || (driver as any).color || 'White';
                 const category = driver.vehicle?.category || (driver as any).category || 'wadaage_taxi';
-                const balance = driver.walletBalanceUsd ?? driver.wallet_balance_usd ?? 0;
+                const liveBal = getDriverWalletBalance(driver.id) || (driver.phone ? getDriverWalletBalance(driver.phone) : 0);
+                const balance = liveBal !== undefined && !isNaN(liveBal) ? liveBal : (driver.walletBalanceUsd ?? driver.wallet_balance_usd ?? 0);
 
                 return (
                   <div
