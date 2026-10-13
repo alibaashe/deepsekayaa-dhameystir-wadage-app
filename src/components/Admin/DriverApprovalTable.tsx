@@ -77,6 +77,12 @@ export const DriverApprovalTable: React.FC = React.memo(() => {
   };
 
   const handleStatusChange = (appId: string, status: 'approved' | 'hold' | 'rejected', driverName: string, note?: string) => {
+    const targetApp = driverApplications.find(a => a.id === appId);
+    if (targetApp && targetApp.status === 'approved' && status === 'approved') {
+      setActionSuccessMessage(`ℹ️ Darawalkan ${driverName} hore ayuu u ahaa mid la ansixiyey (Already Approved)! Waxaa lagu daray nidaamka darawalada.`);
+      setTimeout(() => setActionSuccessMessage(null), 3500);
+      return;
+    }
     updateDriverApplicationStatus(appId, status, note);
     const label = status === 'approved' ? 'Aqbalay / Approved' : status === 'hold' ? 'Hakinay / Put on Hold' : 'Diiday / Rejected';
     setActionSuccessMessage(`✅ Darawalka ${driverName} si guul ah ayaa loo ${label}`);
