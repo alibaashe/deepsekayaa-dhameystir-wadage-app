@@ -2304,7 +2304,9 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .then((data) => {
           if (data && data.success && Array.isArray(data.data) && data.data.length > 0) {
             const dbDrivers: Driver[] = data.data.map((dbD: any) => {
-              const realBalUsd = Number(dbD.walletBalanceUsd ?? dbD.wallet_balance_usd ?? 0);
+              const serverBalUsd = Number(dbD.walletBalanceUsd ?? dbD.wallet_balance_usd ?? 0);
+              const localBalUsd = getDriverWalletBalance(dbD.id) || (dbD.phone ? getDriverWalletBalance(dbD.phone) : 0) || 0;
+              const realBalUsd = Math.max(localBalUsd, serverBalUsd);
               return {
                 id: dbD.id,
                 name: dbD.name,
@@ -2338,24 +2340,27 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 hoursOnline: Number(dbD.hours_online || 0),
                 acceptanceRate: Number(dbD.acceptance_rate || 100),
                 walletBalanceUsd: realBalUsd,
+                wallet_balance_usd: realBalUsd,
               };
             });
 
-            // Synchronize driverWallets with verified database balances (Server database is truth)
+            // Synchronize driverWallets with verified database balances (Preserve whichever balance is higher/newer)
             setDriverWallets((prev) => {
               const updated = { ...prev };
               let changed = false;
               dbDrivers.forEach((d) => {
-                const serverBal = Number(d.walletBalanceUsd ?? 0);
+                const effectiveBal = Number(d.walletBalanceUsd ?? 0);
                 if (d.id) {
-                  if (updated[d.id] !== serverBal) {
-                    updated[d.id] = serverBal;
+                  const cur = updated[d.id] ?? 0;
+                  if (cur < effectiveBal) {
+                    updated[d.id] = effectiveBal;
                     changed = true;
                   }
                 }
                 if (d.phone) {
-                  if (updated[d.phone] !== serverBal) {
-                    updated[d.phone] = serverBal;
+                  const cur = updated[d.phone] ?? 0;
+                  if (cur < effectiveBal) {
+                    updated[d.phone] = effectiveBal;
                     changed = true;
                   }
                 }

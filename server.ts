@@ -1039,12 +1039,20 @@ Return ONLY valid JSON matching this schema:
 
     if (currentStatus === 'completed' || currentStatus === 'verified') {
       let driver = dbService.store.drivers.find(
-        (d: any) =>
-          (targetDriverId && (d.id === targetDriverId || d.user_id === targetDriverId)) ||
-          (targetDriverPhone && d.phone === targetDriverPhone) ||
-          (cleanPhone && d.phone && String(d.phone).replace(/\D/g, '') === cleanPhone) ||
-          (cleanPhone && d.phone && String(d.phone).replace(/\D/g, '').endsWith(cleanPhone)) ||
-          (targetDriverName && d.name && d.name.toLowerCase() === String(targetDriverName).toLowerCase())
+        (d: any) => {
+          if (!d) return false;
+          const dId = String(d.id || d.user_id || '');
+          const dPhone = String(d.phone || '');
+          const cleanDPhone = dPhone.replace(/\D/g, '');
+
+          const idMatch = Boolean(targetDriverId && (dId === targetDriverId || dId === `drv_${targetDriverId}` || targetDriverId === `drv_${dId}`));
+          const exactPhoneMatch = Boolean(targetDriverPhone && dPhone === targetDriverPhone);
+          const cleanPhoneMatch = Boolean(cleanPhone && cleanPhone.length >= 6 && cleanDPhone && (cleanPhone === cleanDPhone || cleanPhone.endsWith(cleanPhone) || cleanDPhone.endsWith(cleanPhone)));
+          const isGenericName = !targetDriverName || ['driver partner', 'captain', 'driver', 'wadaage captain'].includes(String(targetDriverName).toLowerCase().trim());
+          const nameMatch = !isGenericName && Boolean(d.name && String(d.name).toLowerCase().trim() === String(targetDriverName).toLowerCase().trim());
+
+          return idMatch || exactPhoneMatch || cleanPhoneMatch || nameMatch;
+        }
       );
 
       const deltaUsd = Number(tx.amountUsd ?? tx.amount_usd ?? (tx.amountSos ? tx.amountSos / 10000 : 0));
