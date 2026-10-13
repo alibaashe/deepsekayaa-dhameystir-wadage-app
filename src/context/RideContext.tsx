@@ -2341,25 +2341,21 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
               };
             });
 
-            // Synchronize driverWallets with verified database balances (Preserving highest balance via Math.max)
+            // Synchronize driverWallets with verified database balances (Server database is truth)
             setDriverWallets((prev) => {
               const updated = { ...prev };
               let changed = false;
               dbDrivers.forEach((d) => {
                 const serverBal = Number(d.walletBalanceUsd ?? 0);
                 if (d.id) {
-                  const existingMapBal = updated[d.id] ?? 0;
-                  const safeBal = Math.max(existingMapBal, serverBal);
-                  if (updated[d.id] !== safeBal) {
-                    updated[d.id] = safeBal;
+                  if (updated[d.id] !== serverBal) {
+                    updated[d.id] = serverBal;
                     changed = true;
                   }
                 }
                 if (d.phone) {
-                  const existingMapBal = updated[d.phone] ?? 0;
-                  const safeBal = Math.max(existingMapBal, serverBal);
-                  if (updated[d.phone] !== safeBal) {
-                    updated[d.phone] = safeBal;
+                  if (updated[d.phone] !== serverBal) {
+                    updated[d.phone] = serverBal;
                     changed = true;
                   }
                 }
@@ -3522,6 +3518,10 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.setItem('wadaage_driver_wallets_map', JSON.stringify(updated));
         localStorage.setItem('wadaage_v2_wallets', JSON.stringify(updated));
         localStorage.setItem('wadaage_driver_wallet_balance', JSON.stringify(newBalUsd));
+        const nowTs = String(Date.now());
+        for (const a of allAliases) {
+          localStorage.setItem(`wadaage_wallet_ts_${a}`, nowTs);
+        }
       } catch (e) {
         console.error(e);
       }
@@ -6443,10 +6443,6 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateDriverApplicationStatus = (appId: string, status: DriverApplicationStatus, adminNote?: string) => {
-    const targetApp = driverApplications.find(a => a.id === appId);
-    if (targetApp && targetApp.status === 'approved' && status === 'approved') {
-      return;
-    }
     let updatedAppObj: DriverApplication | null = null;
     let newlyCreatedDriver: Driver | null = null;
 
