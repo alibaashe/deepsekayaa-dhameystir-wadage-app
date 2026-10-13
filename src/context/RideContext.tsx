@@ -2139,8 +2139,26 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!identifier) return 0;
 
     const candidateAliases = getDriverAllAliases(identifier, drivers, currentUser, driverApplications);
+    const cleanInput = identifier.replace(/\D/g, '');
 
-    // 1. Check all candidate keys in driverWallets map
+    // 1. Check latest completed transaction in driverWalletTransactions
+    let latestTxBal: number | undefined = undefined;
+    if (driverWalletTransactions && driverWalletTransactions.length > 0) {
+      const latestTx = driverWalletTransactions.find((tx) => {
+        if (!tx || (tx.status !== 'completed' && tx.status !== 'verified')) return false;
+        const txPhoneClean = tx.driverPhone ? tx.driverPhone.replace(/\D/g, '') : '';
+        const matchesId = candidateAliases.has(tx.driverId) || tx.driverId === identifier;
+        const matchesPhone = candidateAliases.has(tx.driverPhone) ||
+          (cleanInput && txPhoneClean && (cleanInput === txPhoneClean || cleanInput.endsWith(txPhoneClean) || txPhoneClean.endsWith(cleanInput)));
+        return matchesId || matchesPhone;
+      });
+
+      if (latestTx && latestTx.newBalanceUsd !== undefined && !isNaN(Number(latestTx.newBalanceUsd))) {
+        latestTxBal = Math.max(0, Math.round(Number(latestTx.newBalanceUsd) * 100) / 100);
+      }
+    }
+
+    // 2. Check all candidate keys in driverWallets map
     const foundMapValues: number[] = [];
     for (const key of candidateAliases) {
       if (driverWallets[key] !== undefined) {
@@ -2151,7 +2169,7 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    // 2. Check matched driver in drivers array
+    // 3. Check matched driver in drivers array
     const matchedDrv = drivers.find((d) => d && (candidateAliases.has(d.id) || (d.phone && candidateAliases.has(d.phone))));
     const drvBalUsd = matchedDrv?.walletBalanceUsd !== undefined
       ? Number(matchedDrv.walletBalanceUsd)
@@ -2159,8 +2177,8 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ? Number((matchedDrv as any).wallet_balance_usd)
       : undefined;
 
-    // 3. Check currentUser if matching
-    const isCurrent = currentUser && currentUser.role === 'driver' && (
+    // 4. Check currentUser if matching
+    const isCurrent = currentUser && (currentUser.role === 'driver' || currentUser.role === 'admin') && (
       candidateAliases.has(currentUser.id) ||
       (currentUser.phone && candidateAliases.has(currentUser.phone)) ||
       (currentUser.name && candidateAliases.has(currentUser.name.toLowerCase().trim()))
@@ -2169,29 +2187,19 @@ export const RideProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ? Number(currentUser.walletBalanceUsd)
       : undefined;
 
-    if (foundMapValues.length > 0) {
-      // Prioritize the direct identifier key or matched driver ID or first available alias value
-      let selectedVal = foundMapValues[0];
-      if (driverWallets[identifier] !== undefined) {
-        selectedVal = Number(driverWallets[identifier]);
-      } else if (matchedDrv?.id && driverWallets[matchedDrv.id] !== undefined) {
-        selectedVal = Number(driverWallets[matchedDrv.id]);
-      } else if (matchedDrv?.phone && driverWallets[matchedDrv.phone] !== undefined) {
-        selectedVal = Number(driverWallets[matchedDrv.phone]);
-      }
-      return Math.max(0, Math.round(selectedVal * 100) / 100);
-    }
+    const valuesToCompare = [
+      latestTxBal,
+      ...foundMapValues,
+      drvBalUsd,
+      userBalUsd,
+    ].filter((v): v is number => v !== undefined && !isNaN(v));
 
-    if (drvBalUsd !== undefined && !isNaN(drvBalUsd)) {
-      return Math.max(0, Math.round(drvBalUsd * 100) / 100);
-    }
-
-    if (userBalUsd !== undefined && !isNaN(userBalUsd)) {
-      return Math.max(0, Math.round(userBalUsd * 100) / 100);
+    if (valuesToCompare.length > 0) {
+      return Math.max(0, Math.round(Math.max(...valuesToCompare) * 100) / 100);
     }
 
     return 0.00;
-  }, [driverWallets, drivers, currentUser, driverApplications, getDriverAllAliases]);
+  }, [driverWallets, drivers, currentUser, driverApplications, driverWalletTransactions, getDriverAllAliases]);
 
   // Current active driver balance: Always reads from canonical unified getDriverWalletBalance
   const activeDriverId =
